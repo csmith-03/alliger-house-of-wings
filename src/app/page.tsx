@@ -17,7 +17,7 @@ export default function Page() {
               2009 Rookie of the Year
             </div>
             <h1 className="mt-4 text-4xl sm:text-6xl font-black tracking-tight text-pure">
-              Welcome to the Best Chicken Wing Sauces Around
+              26 Flavors. Endless Cravings.
             </h1>
             <p className="mt-4 text-base sm:text-lg text-cream/95 max-w-2xl">
               Located on Spring Street in Sayre, Pennsylvania, we&apos;ve been serving the Twin Tiers with

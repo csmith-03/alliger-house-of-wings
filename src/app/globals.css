@@ -3,6 +3,14 @@
 :root {
   --background: #ffe7e7;
   --foreground: #171717;
+
+  /* Light surfaces */
+  --surface: #ffffff;
+  --surface-alt: #fff8f5;
+  --surface-muted: #f3e9e9;
+  --surface-border: rgba(0,0,0,0.08);
+  --surface-border-strong: rgba(0,0,0,0.16);
+  --surface-hover: #ffffff;
 }
 
 @theme inline {
@@ -11,7 +19,6 @@
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 
-  /* Brand colors */
   --color-maroon: #5E0B0B;
   --color-fire: #C22A1F;
   --color-rooster: #DFA32E;
@@ -19,22 +26,43 @@
   --color-pure: #FFFFFF;
 }
 
-/* System preference (fallback if no data-theme is set) */
+/* System preference (fallback) */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --background: #0a0a0a;
     --foreground: #ededed;
+
+    --surface: rgba(255,255,255,0.05);
+    --surface-alt: rgba(255,255,255,0.08);
+    --surface-muted: rgba(255,255,255,0.04);
+    --surface-border: rgba(255,255,255,0.12);
+    --surface-border-strong: rgba(255,255,255,0.22);
+    --surface-hover: rgba(255,255,255,0.12);
   }
 }
 
-/* Explicit themes (override system when set) */
+/* Explicit themes override */
 :root[data-theme="light"] {
   --background: #ffe7e7;
   --foreground: #171717;
+
+  --surface: #ffffff;
+  --surface-alt: #fff8f5;
+  --surface-muted: #f3e9e9;
+  --surface-border: rgba(0,0,0,0.08);
+  --surface-border-strong: rgba(0,0,0,0.16);
+  --surface-hover: #ffffff;
 }
 :root[data-theme="dark"] {
   --background: #0a0a0a;
   --foreground: #ededed;
+
+  --surface: rgba(255,255,255,0.05);
+  --surface-alt: rgba(255,255,255,0.08);
+  --surface-muted: rgba(255,255,255,0.04);
+  --surface-border: rgba(255,255,255,0.12);
+  --surface-border-strong: rgba(255,255,255,0.22);
+  --surface-hover: rgba(255,255,255,0.12);
 }
 
 body {
@@ -42,4 +70,35 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
   transition: background-color 150ms ease, color 150ms ease;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl shadow-sm overflow-hidden transition-colors;
+    background: var(--surface);
+    border: 1px solid var(--surface-border);
+    color: var(--foreground);
+    backdrop-filter: saturate(1.3) blur(2px);
+  }
+  .card:hover {
+    background: var(--surface-hover);
+  }
+  .card-solid {
+    background: var(--surface-alt);
+    border: 1px solid var(--surface-border-strong);
+  }
+  .card-body {
+    @apply p-5;
+  }
+  .card-header {
+    @apply px-5 pt-5 pb-3 font-semibold text-sm tracking-wide uppercase;
+    color: color-mix(in srgb, var(--foreground) 70%, transparent);
+  }
+  .card-footer {
+    @apply px-5 pt-4 pb-5;
+    border-top: 1px solid var(--surface-border);
+  }
+  .bg-surface {
+    background: var(--surface);
+  }
 }
