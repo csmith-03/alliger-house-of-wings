@@ -1,6 +1,7 @@
 import Header from "../../components/header";
 import Footer from "../../components/footer";
 import { getSauceProducts } from "../../lib/productFetch";
+import Image from "next/image";
 
 export const metadata = { title: "Sauces" };
 export const revalidate = 300; // revalidate every 5 min (ISR).
@@ -32,27 +33,43 @@ export default async function SaucesPage() {
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {items.map((p: any) => (
               <article key={p.id} className="card overflow-hidden">
-                <div className={`h-1 ${p.barClass}`} />
-                <div className="card-body pt-5">
-                  <h3 className="font-semibold text-lg">{p.name}</h3>
-                  <p className="mt-1 text-sm text-foreground/70">{p.desc}</p>
-                  <div className="mt-4 flex items-center justify-between">
-                    {p.price && p.currency && (
-                      <span className="text-sm text-foreground/60">
-                        ${(p.price / 100).toFixed(2)} {p.currency.toUpperCase()}
-                      </span>
-                    )}
-                    <a
-                      href="https://store.houseofwings.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-full bg-maroon text-pure px-3 py-1.5 text-sm font-medium hover:brightness-110"
-                    >
-                      Shop
-                    </a>
-                  </div>
+              <div className={`h-1 ${p.barClass}`} />
+              {p.image && (
+                <div className="relative w-full aspect-[4/3] overflow-hidden">
+                  <Image
+                    src={p.image}
+                      // Use a small blur placeholder optionally
+                    alt={p.name}
+                    fill
+                    className="object-cover transition-transform duration-300 group-hover:scale-105"
+                    sizes="(max-width:768px) 100vw, (max-width:1200px) 33vw, 300px"
+                  />
                 </div>
-              </article>
+              )}
+              <div className="card-body pt-5">
+                <h3 className="font-semibold text-lg">{p.name}</h3>
+                {p.desc && (
+                  <p className="mt-1 text-sm text-foreground/70">
+                    {p.desc || "Delicious house-made wing sauce."}
+                  </p>
+                )}
+                <div className="mt-4 flex items-center justify-between">
+                  {p.price && p.currency && (
+                    <span className="text-sm text-foreground/60">
+                      ${(p.price / 100).toFixed(2)} {p.currency.toUpperCase()}
+                    </span>
+                  )}
+                  <a
+                    href="https://store.houseofwings.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-full bg-maroon text-pure px-3 py-1.5 text-sm font-medium hover:brightness-110"
+                  >
+                    Shop
+                  </a>
+                </div>
+              </div>
+            </article>
             ))}
 
             {items.length === 0 && (

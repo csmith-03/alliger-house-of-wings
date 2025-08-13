@@ -5,3 +5,12 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
+
+module.exports = {
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: "files.stripe.com" },
+      // add any other hostnames if needed
+    ],
+  },
+};

@@ -1,11 +1,7 @@
+import Stripe from "stripe";
 import { stripe } from "./stripeclient";
-import type Stripe from "stripe";
 
-const BAR: Record<string,string> = {
-  maroon: "bg-maroon",
-  fire: "bg-fire",
-  rooster: "bg-rooster",
-};
+const BAR: Record<string,string> = { maroon:"bg-maroon", fire:"bg-fire", rooster:"bg-rooster" };
 
 export interface SauceItem {
   id: string;
@@ -15,6 +11,7 @@ export interface SauceItem {
   price: number | null;
   currency: string | null;
   priceId: string | null;
+  image: string | null;
 }
 
 export async function getSauceProducts(): Promise<SauceItem[]> {
@@ -33,21 +30,9 @@ export async function getSauceProducts(): Promise<SauceItem[]> {
 
   console.log("[getSauceProducts] fetched count:", products.data.length);
 
-  // Lightweight, readable snapshot (no giant objects)
-  console.dir(
-    products.data.map(p => ({
-      id: p.id,
-      name: p.name,
-      metadata: p.metadata,
-      default_price_id: (p.default_price as Stripe.Price | null)?.id || null,
-      amount: (p.default_price as Stripe.Price | null)?.unit_amount || null,
-      currency: (p.default_price as Stripe.Price | null)?.currency || null,
-    })),
-    { depth: null }
-  );
-
   const mapped = products.data.map(p => {
     const defaultPrice = p.default_price as Stripe.Price | null;
+    const img = p.images && p.images.length > 0 ? p.images[0] : null;
     return {
       id: p.id,
       name: p.name,
@@ -56,6 +41,7 @@ export async function getSauceProducts(): Promise<SauceItem[]> {
       price: defaultPrice?.unit_amount ?? null,
       currency: defaultPrice?.currency ?? null,
       priceId: defaultPrice?.id || null,
+      image: img,
     };
   });
 
