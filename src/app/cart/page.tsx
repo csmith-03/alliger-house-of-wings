@@ -13,7 +13,6 @@ export default function CartPage() {
           <CartClient />
         </section>
       </main>
-      <Footer />
     </div>
   );
 }

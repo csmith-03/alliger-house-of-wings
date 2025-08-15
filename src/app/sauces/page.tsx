@@ -84,7 +84,6 @@ export default async function SaucesPage() {
           </div>
         </section>
       </main>
-      <Footer />
     </div>
   );
 }

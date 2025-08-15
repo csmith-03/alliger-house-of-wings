@@ -77,12 +77,11 @@ export default function Header() {
             </button>
 
             <div className="hidden md:flex items-center gap-2">
-              {navLink("/", "Menu", Utensils)}
+              {navLink("/", "Home", Utensils)}
               {navLink("/sauces", "Sauces", Flame)}
               {navLink("/about", "About", Info)}
-              <div className="inline-flex">
-                <CartMini />
-              </div>
+              {/* Uniform cart tab (icon + count only) */}
+              <CartMini />
             </div>
 
             <button
@@ -96,24 +95,7 @@ export default function Header() {
             >
               {mounted && (theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />)}
             </button>
-
-            <Link
-              href="https://store.houseofwings.com"
-              target="_blank"
-              className="inline-flex md:hidden items-center justify-center h-9 w-9 rounded-full bg-fire text-pure hover:bg-maroon"
-              aria-label="Shop sauces"
-            >
-              <ShoppingCart className="h-4 w-4" />
-            </Link>
-
-            <Link
-              href="https://store.houseofwings.com"
-              target="_blank"
-              className="hidden md:inline-flex items-center gap-2 rounded-full bg-fire text-pure hover:bg-maroon transition-colors px-4 py-2 text-sm font-semibold shadow-sm"
-            >
-              <ShoppingCart className="h-4 w-4" />
-              Shop sauces
-            </Link>
+            {/* Optional external shop button(s) can remain here */}
           </nav>
         </div>
       </header>

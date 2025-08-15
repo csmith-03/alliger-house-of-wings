@@ -120,7 +120,6 @@ export default async function Page() {
           </div>
         </section>
       </main>
-      <Footer />
     </div>
   );
 }
