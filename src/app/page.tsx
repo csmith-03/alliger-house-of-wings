@@ -1,14 +1,24 @@
 import Link from "next/link";
 import Header from "../components/header";
 import Footer from "../components/footer";
+import { getSauceProducts } from "../lib/productFetch";
+import Image from "next/image";
+import AddToCartButton from "../components/add-to-cart-btn";
 
-export default function Page() {
+export const revalidate = 300;
+
+export default async function Page() {
+  let items: any[] = [];
+  try {
+    items = await getSauceProducts();
+  } catch {
+    items = [];
+  }
+
   return (
     <div className="font-sans min-h-screen bg-background text-foreground">
       <Header />
-
       <main>
-        {/* Hero */}
         <section className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-maroon via-fire to-rooster" />
           <div className="relative mx-auto max-w-6xl px-6 py-20 sm:py-28">
@@ -20,8 +30,7 @@ export default function Page() {
               26 Flavors. Endless Cravings.
             </h1>
             <p className="mt-4 text-base sm:text-lg text-cream/95 max-w-2xl">
-              Located on Spring Street in Sayre, Pennsylvania, we&apos;ve been serving the Twin Tiers with
-              unforgettable wings and nine signature sauces—now available online.
+              Located on Spring Street in Sayre, Pennsylvania, we&apos;ve been serving the Twin Tiers with unforgettable wings.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3 sm:items-center">
               <a
@@ -42,51 +51,76 @@ export default function Page() {
           </div>
         </section>
 
-        {/* Sauce lineup */}
         <section id="sauces" className="mx-auto max-w-6xl px-6 py-16">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Nine unforgettable flavors</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Our Sauces (Live from Stripe)</h2>
           <p className="mt-2 text-foreground/70">
-            Not just another Buffalo imitation—our sauces are all flavor, crafted for wings and more.
+            Pulled live from Stripe (test mode). Pricing & descriptions managed in your Stripe dashboard.
           </p>
 
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              { name: "Nuclear", note: "Extreme heat • Super Cayenne 120,000 Scoville", bar: "bg-fire" },
-              { name: "Kamikaze", note: "Very hot • Bold and fiery", bar: "bg-maroon" },
-              { name: "Hot", note: "Classic heat • Balanced kick", bar: "bg-rooster" },
-              { name: "Cajun", note: "Zesty • Savory spice blend", bar: "bg-maroon" },
-              { name: "BBQ", note: "Smoky-sweet • Crowd favorite", bar: "bg-fire" },
-              { name: "Singapore", note: "Sweet-heat • East-meets-West", bar: "bg-rooster" },
-              { name: "Garlic", note: "Rich • Savory garlic finish", bar: "bg-maroon" },
-              { name: "Southern", note: "Mild • Comforting and classic", bar: "bg-fire" },
-              { name: "Honey Mustard", note: "Sweet • Tangy gold", bar: "bg-rooster" },
-            ].map((sauce) => (
-              <article
-                key={sauce.name}
-                className="group rounded-xl border border-black/10 dark:border-white/10 bg-pure text-foreground shadow-sm overflow-hidden"
-              >
-                <div className={`h-1 ${sauce.bar}`} />
-                <div className="p-5">
-                  <h3 className="font-semibold text-lg">{sauce.name}</h3>
-                  <p className="mt-1 text-sm text-foreground/70">{sauce.note}</p>
+            {items.map((p: any) => (
+              <article key={p.id} className="card overflow-hidden group">
+                <div className={`h-1 ${p.barClass}`} />
+                {p.image && (
+                  <div className="relative w-full aspect-[4/3] overflow-hidden">
+                    <Image
+                      src={p.image}
+                      alt={p.name}
+                      fill
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      sizes="(max-width:768px) 100vw, (max-width:1200px) 33vw, 300px"
+                    />
+                  </div>
+                )}
+                <div className="card-body pt-5">
+                  <h3 className="font-semibold text-lg">{p.name}</h3>
+                  {p.desc && (
+                    <p className="mt-1 text-sm text-foreground/70">
+                      {p.desc || "Delicious house-made wing sauce."}
+                    </p>
+                  )}
                   <div className="mt-4 flex items-center justify-between">
-                    <span className="text-sm text-foreground/60">8 oz and 1 gal sizes</span>
-                    <a
-                      href="https://store.houseofwings.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-full bg-maroon text-pure px-3 py-1.5 text-sm font-medium hover:brightness-110"
-                    >
-                      Shop
-                    </a>
+                    {p.price && p.currency && (
+                      <span className="text-sm text-foreground/60">
+                        ${(p.price / 100).toFixed(2)} {p.currency.toUpperCase()}
+                      </span>
+                    )}
+                    <AddToCartButton
+                      product={{
+                        productId: p.id,
+                        priceId: p.priceId,
+                        name: p.name,
+                        price: p.price,
+                        currency: p.currency,
+                        image: p.image,
+                      }}
+                    />
                   </div>
                 </div>
               </article>
             ))}
+
+            {items.length === 0 && (
+              <div className="card">
+                <div className="card-body">
+                  <p className="text-sm text-foreground/70">
+                    No active Stripe products found. Add products and metadata (bar_color, flavor_description) in Stripe.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="mt-10">
+            <Link
+              href="/sauces"
+              className="inline-flex items-center rounded-full bg-maroon text-pure px-5 py-2 text-sm font-semibold hover:brightness-110"
+            >
+              View all sauces
+            </Link>
           </div>
         </section>
       </main>
-
       <Footer />
     </div>
   );

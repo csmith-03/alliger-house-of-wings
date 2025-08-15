@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
+import CartMini from "@/app/cart/cart-mini";
 import {
   Utensils,
   Info,
@@ -139,7 +140,9 @@ export default function Header() {
               {navLink("/", "Menu", Utensils)}
               {navLink("/sauces", "Sauces", Flame)}
               {navLink("/about", "About", Info)}
-              {navLink("/checkout", "Checkout", ShoppingCart)}
+              <div className="inline-flex">
+                <CartMini />
+              </div>
             </div>
 
             {/* Theme toggle */}
