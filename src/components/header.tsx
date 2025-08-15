@@ -7,7 +7,7 @@ import { useTheme } from "../app/theme-provider"; // NEW
 import CartMini from "../app/cart/cart-mini";
 import {
   Utensils, Info, ShoppingCart, Phone, MapPin,
-  Sun, Moon, Menu, X, Flame
+  Sun, Moon, Menu, X, Flame, HeartPulse
 } from "lucide-react";
 
 export default function Header() {
@@ -79,6 +79,7 @@ export default function Header() {
             <div className="hidden md:flex items-center gap-2">
               {navLink("/", "Home", Utensils)}
               {navLink("/sauces", "Sauces", Flame)}
+              {navLink("/benefits", "Benefits", HeartPulse)}
               {navLink("/about", "About", Info)}
               {/* Uniform cart tab (icon + count only) */}
               <CartMini />
@@ -136,6 +137,9 @@ export default function Header() {
           <Link onClick={() => setOpen(false)} href="/sauces" className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5">
             <Flame className="h-4 w-4" /> Sauces
           </Link>
+          <Link onClick={close} href="/benefits" className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5">
++           <HeartPulse className="h-4 w-4" /> Benefits
++         </Link>
           <Link onClick={() => setOpen(false)} href="/about" className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5">
             <Info className="h-4 w-4" /> About
           </Link>
