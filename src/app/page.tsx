@@ -17,7 +17,6 @@ export default async function Page() {
 
   return (
     <div className="font-sans min-h-screen bg-background text-foreground">
-      <Header />
       <main>
         <section className="relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-br from-maroon via-fire to-rooster" />

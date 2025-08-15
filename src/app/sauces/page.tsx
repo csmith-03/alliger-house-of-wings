@@ -16,7 +16,6 @@ export default async function SaucesPage() {
 
   return (
     <div className="font-sans min-h-screen bg-background text-foreground">
-      <Header />
       <main>
         <section className="mx-auto max-w-6xl px-6 py-16">
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-maroon via-fire to-rooster bg-clip-text text-transparent">

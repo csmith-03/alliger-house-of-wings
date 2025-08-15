@@ -4,7 +4,6 @@ import Footer from "../../components/footer";
 export default function AboutPage() {
   return (
     <div className="font-sans min-h-screen bg-background text-foreground">
-      <Header />
       <main>
         <section className="mx-auto max-w-6xl px-6 py-16 grid grid-cols-1 lg:grid-cols-2 gap-10">
           <div>
