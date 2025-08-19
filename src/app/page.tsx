@@ -29,7 +29,7 @@ export default async function Page() {
               26 Flavors. Endless Cravings.
             </h1>
             <p className="mt-4 text-base sm:text-lg text-cream/95 max-w-2xl">
-              Located on Spring Street in Sayre, Pennsylvania, we&apos;ve been serving the Twin Tiers with unforgettable wings.
+              Located on Spring Street in Sayre, Pennsylvania, we&apos;ve been serving the Twin Tiers with unforgettable wings since 1983.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3 sm:items-center">
               <a

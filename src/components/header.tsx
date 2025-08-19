@@ -3,11 +3,11 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useTheme } from "../app/theme-provider"; // NEW
+import { useTheme } from "../app/theme-provider"; 
 import CartMini from "../app/cart/cart-mini";
 import {
   Utensils, Info, ShoppingCart, Phone, MapPin,
-  Sun, Moon, Menu, X, Flame, HeartPulse
+  Sun, Moon, Menu, X, Flame, HeartPulse, FileDown
 } from "lucide-react";
 
 export default function Header() {
@@ -33,23 +33,49 @@ export default function Header() {
 
   const navLink = (href: string, label: string, Icon: any) => {
     const active = pathname === href;
-    const base = "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium border transition-colors";
-    const activeCls = "border-maroon text-maroon bg-maroon/5";
-    const idleCls = "border-transparent text-foreground/70 hover:text-foreground hover:bg-foreground/5";
+    const base =
+      "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium border transition-colors";
+    const activeCls = theme === "dark"
+      ? "border-rooster text-rooster bg-rooster/10"
+      : "border-maroon text-maroon bg-maroon/10";
+    const idleCls =
+      "border-transparent text-foreground/70 hover:text-foreground hover:bg-foreground/5";
+
     return (
-      <Link key={href} href={href} aria-current={active ? "page" : undefined}
-            className={`${base} ${active ? activeCls : idleCls}`}>
+      <Link
+        key={href}
+        href={href}
+        aria-current={active ? "page" : undefined}
+        className={`${base} ${active ? activeCls : idleCls}`}
+      >
         <Icon className="h-4 w-4" />
         {label}
       </Link>
     );
   };
 
+    const sinceBadgeCls = theme === "dark"
+        ? "bg-rooster/10 text-rooster"
+        : "bg-maroon/10 text-maroon";
+
+    const handleBarMenu = (e: React.MouseEvent) => {
+        e.preventDefault();
+        const url = "/Bar%20Menu.pdf"; // file placed in /public
+        // Open in new tab
+        window.open(url, "_blank", "noopener,noreferrer");
+        // Trigger download
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "Bar Menu.pdf";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+    };
   return (
     <>
       <header className="sticky top-0 z-10 bg-pure/80 dark:bg-black/30 backdrop-blur border-b border-black/10 dark:border-white/10">
         <div className="w-full px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex items-center">
-          <Link href="/" aria-label="Home" className="flex items-center gap-3">
+        <Link href="/" aria-label="Home" className="flex items-center gap-3">
             <Image src="/logo.png" alt="" width={56} height={56} priority className="h-12 w-12 sm:h-14 sm:w-14" />
             <div className="leading-tight">
               <span className="block text-2xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-maroon via-fire to-rooster bg-clip-text text-transparent">
@@ -59,7 +85,7 @@ export default function Header() {
                 House of Wings
               </span>
             </div>
-            <span className="ml-2 hidden sm:inline-flex items-center rounded-full bg-maroon/10 text-maroon px-2.5 py-1 text-[10px] font-bold tracking-wide">
+            <span className={`ml-2 hidden sm:inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide ${sinceBadgeCls}`}>
               Since 1983
             </span>
           </Link>
@@ -76,14 +102,24 @@ export default function Header() {
               <Menu className="h-4 w-4" />
             </button>
 
+            
+
             <div className="hidden md:flex items-center gap-2">
               {navLink("/", "Home", Utensils)}
               {navLink("/sauces", "Sauces", Flame)}
               {navLink("/benefits", "Benefits", HeartPulse)}
               {navLink("/about", "About", Info)}
-              {/* Uniform cart tab (icon + count only) */}
               <CartMini />
             </div>
+
+            <button
+              type="button"
+              onClick={handleBarMenu}
+              aria-label="Open and download Bar Menu PDF"
+              className="hidden md:inline-flex items-center justify-center h-9 w-9 rounded-full border border-foreground/20 text-foreground/80 hover:bg-foreground/5"
+            >
+              <FileDown className="h-4 w-4" />
+            </button>
 
             <button
               type="button"
