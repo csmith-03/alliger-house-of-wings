@@ -1,5 +1,17 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Goal
+The goal of this project is to create an e-commerce site for Alliger's House of Wings. The site will consist of a landing page, about, sauce descriptions, and a checkout with payment processing via Stripe. This project will conclude in the Fall of 2026.
+
+## Tech Stack
+- Next.js
+- Stripe
+- Tailwind CSS with Lucide React icons
+
+## Contact 
+- Channing Smith
+- Julia Kempton
+
 ## Getting Started
 
 First, run the development server:

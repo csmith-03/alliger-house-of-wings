@@ -5,7 +5,6 @@ import Footer from "../../components/footer";
 export default function CheckoutPage() {
   return (
     <div className="font-sans min-h-screen bg-background text-foreground">
-      <Header />
       <main>
         <section className="mx-auto max-w-3xl px-6 py-16">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Checkout</h2>
@@ -64,7 +63,6 @@ export default function CheckoutPage() {
           </div>
         </section>
       </main>
-      <Footer />
     </div>
   );
 }
