@@ -20,6 +20,8 @@ interface CartCtx {
   count: number;
   subtotal: number;
   currency: string | null;
+  shippingRate: any;
+  setShippingRate: (rate: any) => void;
 }
 
 const CartContext = createContext<CartCtx | null>(null);
@@ -27,6 +29,7 @@ const LS_KEY = "how_cart_v1";
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [shippingRate, setShippingRate] = useState<any>(null);
 
   useEffect(() => {
     try {
@@ -59,11 +62,25 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   const subtotal = items.reduce((s,i)=>s + (i.price||0)*i.qty,0);
   const currency = items[0]?.currency || null;
 
-  const value = useMemo(()=>({ items, add, remove, setQty, clear, count, subtotal, currency }), [items, count, subtotal, currency]);
+const value = useMemo(() => ({
+    items,
+    add,
+    remove,
+    setQty,
+    clear,
+    count,
+    subtotal,
+    currency,
+    shippingRate,
+    setShippingRate,
+  }), [items, count, subtotal, currency, shippingRate]);
 
-  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
+  return (
+    <CartContext.Provider value={value}>
+      {children}
+    </CartContext.Provider>
+  );
 }
-
 export function useCart() {
   const c = useContext(CartContext);
   if (!c) throw new Error("useCart must be used within CartProvider");

@@ -4,7 +4,7 @@ export type CartLine = { price?: number; qty?: number };
 
 export const SHIPPING_THRESHOLD = 75_00; // free shipping >= $75.00
 export const FLAT_SHIP = 5_99;           // $5.99
-export const TAX_RATE = 0.08875;         // 8.875%
+export const TAX_RATE = 0.08;
 
 export function money(cents: number, currency = "USD") {
   return new Intl.NumberFormat(undefined, { style: "currency", currency })

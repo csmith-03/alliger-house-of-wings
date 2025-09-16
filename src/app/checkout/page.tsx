@@ -1,4 +1,5 @@
 import { ShoppingCart } from "lucide-react";
+import { useState } from "react";
 import Header from "../../components/header";
 import Footer from "../../components/footer";
 
@@ -63,6 +64,38 @@ export default function CheckoutPage() {
           </div>
         </section>
       </main>
+    </div>
+  );
+}
+
+function ShippingRates({ address, items }) {
+  const [rates, setRates] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchRates = async () => {
+    setLoading(true);
+    const res = await fetch("/api/shipping", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ address, items }),
+    });
+    const data = await res.json();
+    setRates(data.rates || []);
+    setLoading(false);
+  };
+
+  return (
+    <div>
+      <button onClick={fetchRates} disabled={loading}>
+        {loading ? "Loading..." : "Get Shipping Rates"}
+      </button>
+      <ul>
+        {rates.map(rate => (
+          <li key={rate.object_id}>
+            {rate.provider} {rate.servicelevel.name}: ${rate.amount}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
