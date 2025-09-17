@@ -5,11 +5,16 @@ import Link from "next/link";
 import { useMemo } from "react";
 import { useCart } from "../cart-provider";
 import { money, shippingFor, taxFor } from "@/lib/order-math";  // <-- import
+import ShippingRates from "../checkout/shipping-rates";
 
 export default function CartClient() {
-  const { items, setQty, remove, clear, subtotal, currency } = useCart();
-
-  const shipping = useMemo(() => shippingFor(subtotal), [subtotal]);
+const { items, setQty, remove, clear, subtotal, currency, shippingRate } = useCart();
+  const shipping = useMemo(() => {
+    if (shippingRate && shippingRate.amount) {
+      return Math.round(parseFloat(shippingRate.amount) * 100); // Always round to cents
+    }
+    return null;
+  }, [shippingRate]);
   const tax = useMemo(() => taxFor(subtotal), [subtotal]);
   const total = useMemo(() => subtotal + shipping + tax, [subtotal, shipping, tax]);
 
@@ -64,19 +69,26 @@ export default function CartClient() {
           <span className="font-medium">{money(subtotal, currency ?? "USD")}</span>
         </div>
 
-        <div className="flex items-center justify-between">
-          <span className="text-foreground/70">
-            Shipping {subtotal >= 75_00 ? "(free over $75.00)" : ""}
-          </span>
-          <span className="font-medium">{shipping === 0 ? "Free" : money(shipping, currency ?? "USD")}</span>
-        </div>
+      <div className="flex items-center justify-between">
+        <span className="text-foreground/70">Shipping</span>
+        <span className="font-medium flex flex-col items-end">
+          {shipping == null
+            ? "Select address"
+            : money(shipping, currency ?? "USD")}
+          {shippingRate && shippingRate.provider && (
+            <span className="text-xs text-foreground/60 mt-1">
+              {shippingRate.provider} {shippingRate.servicelevel?.name}
+            </span>
+          )}
+        </span>
+      </div>
 
-        <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between">
           <span className="text-foreground/70">Tax (est.)</span>
           <span className="font-medium">{money(tax, currency ?? "USD")}</span>
-        </div>
+      </div>
 
-        <div className="flex items-center justify-between border-t pt-4 text-base">
+      <div className="flex items-center justify-between border-t pt-4 text-base">
           <span className="font-semibold">Total (est.)</span>
           <span className="font-semibold">{money(total, currency ?? "USD")}</span>
         </div>
