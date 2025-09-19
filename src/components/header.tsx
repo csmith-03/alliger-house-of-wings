@@ -3,11 +3,21 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
-import { useTheme } from "../app/theme-provider"; 
-import CartMini from "../app/cart/cart-mini";
+import { useTheme } from "../app/theme-provider";
+import { CartMini } from "@/components/cart";
 import {
-  Utensils, Info, ShoppingCart, Phone, MapPin,
-  Sun, Moon, Menu, X, Flame, HeartPulse, FileDown
+  Utensils,
+  Info,
+  ShoppingCart,
+  Phone,
+  MapPin,
+  Sun,
+  Moon,
+  Menu,
+  X,
+  Flame,
+  HeartPulse,
+  FileDown,
 } from "lucide-react";
 
 export default function Header() {
@@ -17,7 +27,7 @@ export default function Header() {
   // Mobile drawer state
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
-  const toggle = () => setOpen(o => !o);
+  const toggle = () => setOpen((o) => !o);
 
   useEffect(() => close(), [pathname]);
   useEffect(() => {
@@ -28,16 +38,19 @@ export default function Header() {
   useEffect(() => {
     const prev = document.body.style.overflow;
     if (open) document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = prev; };
+    return () => {
+      document.body.style.overflow = prev;
+    };
   }, [open]);
 
   const navLink = (href: string, label: string, Icon: any) => {
     const active = pathname === href;
     const base =
       "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium border transition-colors";
-    const activeCls = theme === "dark"
-      ? "border-rooster text-rooster bg-rooster/10"
-      : "border-maroon text-maroon bg-maroon/10";
+    const activeCls =
+      theme === "dark"
+        ? "border-rooster text-rooster bg-rooster/10"
+        : "border-maroon text-maroon bg-maroon/10";
     const idleCls =
       "border-transparent text-foreground/70 hover:text-foreground hover:bg-foreground/5";
 
@@ -54,29 +67,37 @@ export default function Header() {
     );
   };
 
-    const sinceBadgeCls = theme === "dark"
-        ? "bg-rooster/10 text-rooster"
-        : "bg-maroon/10 text-maroon";
+  const sinceBadgeCls =
+    theme === "dark"
+      ? "bg-rooster/10 text-rooster"
+      : "bg-maroon/10 text-maroon";
 
-    const handleBarMenu = (e: React.MouseEvent) => {
-        e.preventDefault();
-        const url = "/Bar%20Menu.pdf"; // file placed in /public
-        // Open in new tab
-        window.open(url, "_blank", "noopener,noreferrer");
-        // Trigger download
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "Bar Menu.pdf";
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
-    };
+  const handleBarMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const url = "/Bar%20Menu.pdf"; // file placed in /public
+    // Open in new tab
+    window.open(url, "_blank", "noopener,noreferrer");
+    // Trigger download
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "Bar Menu.pdf";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
   return (
     <>
       <header className="sticky top-0 z-10 bg-pure/80 dark:bg-black/30 backdrop-blur border-b border-black/10 dark:border-white/10">
         <div className="w-full px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex items-center">
-        <Link href="/" aria-label="Home" className="flex items-center gap-3">
-            <Image src="/logo.png" alt="" width={56} height={56} priority className="h-12 w-12 sm:h-14 sm:w-14" />
+          <Link href="/" aria-label="Home" className="flex items-center gap-3">
+            <Image
+              src="/logo.png"
+              alt=""
+              width={56}
+              height={56}
+              priority
+              className="h-12 w-12 sm:h-14 sm:w-14"
+            />
             <div className="leading-tight">
               <span className="block text-2xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-maroon via-fire to-rooster bg-clip-text text-transparent">
                 Alliger&apos;s
@@ -85,7 +106,9 @@ export default function Header() {
                 House of Wings
               </span>
             </div>
-            <span className={`ml-2 hidden sm:inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide ${sinceBadgeCls}`}>
+            <span
+              className={`ml-2 hidden sm:inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-bold tracking-wide ${sinceBadgeCls}`}
+            >
               Since 1983
             </span>
           </Link>
@@ -101,8 +124,6 @@ export default function Header() {
             >
               <Menu className="h-4 w-4" />
             </button>
-
-            
 
             <div className="hidden md:flex items-center gap-2">
               {navLink("/", "Home", Utensils)}
@@ -125,12 +146,27 @@ export default function Header() {
               type="button"
               onClick={toggleTheme}
               disabled={!mounted}
-              aria-label={mounted ? `Switch to ${theme === "dark" ? "light" : "dark"} mode` : "Theme"}
+              aria-label={
+                mounted
+                  ? `Switch to ${theme === "dark" ? "light" : "dark"} mode`
+                  : "Theme"
+              }
               aria-pressed={theme === "dark"}
               className="inline-flex items-center justify-center h-9 w-9 rounded-full border border-foreground/20 text-foreground/80 hover:bg-foreground/5"
-              title={mounted ? (theme === "dark" ? "Switch to light mode" : "Switch to dark mode") : "Theme"}
+              title={
+                mounted
+                  ? theme === "dark"
+                    ? "Switch to light mode"
+                    : "Switch to dark mode"
+                  : "Theme"
+              }
             >
-              {mounted && (theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />)}
+              {mounted &&
+                (theme === "dark" ? (
+                  <Sun className="h-4 w-4" />
+                ) : (
+                  <Moon className="h-4 w-4" />
+                ))}
             </button>
             {/* Optional external shop button(s) can remain here */}
           </nav>
@@ -154,7 +190,13 @@ export default function Header() {
       >
         <div className="p-4 flex items-center justify-between border-b border-black/10 dark:border-white/10">
           <div className="flex items-center gap-2">
-            <Image src="/logo.png" alt="" width={28} height={28} className="h-7 w-7" />
+            <Image
+              src="/logo.png"
+              alt=""
+              width={28}
+              height={28}
+              className="h-7 w-7"
+            />
             <span className="text-base font-semibold">Alliger&apos;s</span>
           </div>
           <button
@@ -167,19 +209,39 @@ export default function Header() {
         </div>
 
         <nav className="p-4 flex flex-col gap-2">
-          <Link onClick={() => setOpen(false)} href="/" className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5">
+          <Link
+            onClick={() => setOpen(false)}
+            href="/"
+            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5"
+          >
             <Utensils className="h-4 w-4" /> Menu
           </Link>
-          <Link onClick={() => setOpen(false)} href="/sauces" className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5">
+          <Link
+            onClick={() => setOpen(false)}
+            href="/sauces"
+            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5"
+          >
             <Flame className="h-4 w-4" /> Sauces
           </Link>
-          <Link onClick={close} href="/benefits" className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5">
-+           <HeartPulse className="h-4 w-4" /> Benefits
-+         </Link>
-          <Link onClick={() => setOpen(false)} href="/about" className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5">
+          <Link
+            onClick={close}
+            href="/benefits"
+            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5"
+          >
+            + <HeartPulse className="h-4 w-4" /> Benefits +{" "}
+          </Link>
+          <Link
+            onClick={() => setOpen(false)}
+            href="/about"
+            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5"
+          >
             <Info className="h-4 w-4" /> About
           </Link>
-          <Link onClick={() => setOpen(false)} href="/cart" className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5">
+          <Link
+            onClick={() => setOpen(false)}
+            href="/cart"
+            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5"
+          >
             <ShoppingCart className="h-4 w-4" /> Cart
           </Link>
         </nav>
@@ -191,7 +253,12 @@ export default function Header() {
             className="w-full inline-flex items-center justify-between rounded-lg border border-foreground/20 px-3 py-2 text-sm hover:bg-foreground/5"
           >
             <span>Theme</span>
-            {mounted && (theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />)}
+            {mounted &&
+              (theme === "dark" ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              ))}
           </button>
         </div>
       </aside>
