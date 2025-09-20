@@ -29,7 +29,8 @@ export default async function Page() {
               26 Flavors. Endless Cravings.
             </h1>
             <p className="mt-4 text-base sm:text-lg text-cream/95 max-w-2xl">
-              Located on Spring Street in Sayre, Pennsylvania, we&apos;ve been serving the Twin Tiers with unforgettable wings since 1983.
+              Located on Spring Street in Sayre, Pennsylvania, we&apos;ve been
+              serving the Twin Tiers with unforgettable wings since 1983.
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3 sm:items-center">
               <a
@@ -51,9 +52,12 @@ export default async function Page() {
         </section>
 
         <section id="sauces" className="mx-auto max-w-6xl px-6 py-16">
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Our Sauces (Live from Stripe)</h2>
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
+            Our Sauces (Live from Stripe)
+          </h2>
           <p className="mt-2 text-foreground/70">
-            Pulled live from Stripe (test mode). Pricing & descriptions managed in your Stripe dashboard.
+            Pulled live from Stripe (test mode). Pricing & descriptions managed
+            in your Stripe dashboard.
           </p>
 
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -62,7 +66,7 @@ export default async function Page() {
                 <div className={`h-1 ${p.barClass}`} />
                 {p.image && (
                   <div className="relative w-full aspect-[4/3] overflow-hidden">
-                    <Image
+                    <img
                       src={p.image}
                       alt={p.name}
                       fill
@@ -103,7 +107,8 @@ export default async function Page() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-sm text-foreground/70">
-                    No active Stripe products found. Add products and metadata (bar_color, flavor_description) in Stripe.
+                    No active Stripe products found. Add products and metadata
+                    (bar_color, flavor_description) in Stripe.
                   </p>
                 </div>
               </div>

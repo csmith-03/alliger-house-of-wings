@@ -23,7 +23,8 @@ export default async function SaucesPage() {
           </h1>
 
           <p className="mt-4 text-foreground/80 max-w-3xl">
-            For years, our sauces have been a favorite at our Sayre, PA restaurant—now available online.
+            For years, our sauces have been a favorite at our Sayre, PA
+            restaurant—now available online.
           </p>
           <p className="mt-2 text-foreground/80 max-w-3xl">
             Pulled live from Stripe (test mode).
@@ -32,51 +33,52 @@ export default async function SaucesPage() {
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {items.map((p: any) => (
               <article key={p.id} className="card overflow-hidden">
-              <div className={`h-1 ${p.barClass}`} />
-              {p.image && (
-                <div className="relative w-full aspect-[4/3] overflow-hidden">
-                  <Image
-                    src={p.image}
+                <div className={`h-1 ${p.barClass}`} />
+                {p.image && (
+                  <div className="relative w-full aspect-[4/3] overflow-hidden">
+                    <img
+                      src={p.image}
                       // Use a small blur placeholder optionally
-                    alt={p.name}
-                    fill
-                    className="object-cover transition-transform duration-300 group-hover:scale-105"
-                    sizes="(max-width:768px) 100vw, (max-width:1200px) 33vw, 300px"
-                  />
-                </div>
-              )}
-              <div className="card-body pt-5">
-                <h3 className="font-semibold text-lg">{p.name}</h3>
-                {p.desc && (
-                  <p className="mt-1 text-sm text-foreground/70">
-                    {p.desc || "Delicious house-made wing sauce."}
-                  </p>
+                      alt={p.name}
+                      fill
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      sizes="(max-width:768px) 100vw, (max-width:1200px) 33vw, 300px"
+                    />
+                  </div>
                 )}
-                <div className="mt-4 flex items-center justify-between">
-                  {p.price && p.currency && (
-                    <span className="text-sm text-foreground/60">
-                      ${(p.price / 100).toFixed(2)} {p.currency.toUpperCase()}
-                    </span>
+                <div className="card-body pt-5">
+                  <h3 className="font-semibold text-lg">{p.name}</h3>
+                  {p.desc && (
+                    <p className="mt-1 text-sm text-foreground/70">
+                      {p.desc || "Delicious house-made wing sauce."}
+                    </p>
                   )}
-                  <a
-                    href="https://store.houseofwings.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-full bg-maroon text-pure px-3 py-1.5 text-sm font-medium hover:brightness-110"
-                  >
-                    Shop
-                  </a>
+                  <div className="mt-4 flex items-center justify-between">
+                    {p.price && p.currency && (
+                      <span className="text-sm text-foreground/60">
+                        ${(p.price / 100).toFixed(2)} {p.currency.toUpperCase()}
+                      </span>
+                    )}
+                    <a
+                      href="https://store.houseofwings.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-full bg-maroon text-pure px-3 py-1.5 text-sm font-medium hover:brightness-110"
+                    >
+                      Shop
+                    </a>
+                  </div>
                 </div>
-              </div>
-            </article>
+              </article>
             ))}
 
             {items.length === 0 && (
               <div className="card">
                 <div className="card-body">
                   <p className="text-sm text-foreground/70">
-                    No active Stripe products found. Add products in Stripe (test mode) with metadata:
-                    bar_color (maroon|fire|rooster) and flavor_description.
+                    No active Stripe products found. Add products in Stripe
+                    (test mode) with metadata: bar_color (maroon|fire|rooster)
+                    and flavor_description.
                   </p>
                 </div>
               </div>
