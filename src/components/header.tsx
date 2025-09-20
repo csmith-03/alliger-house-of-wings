@@ -90,13 +90,13 @@ export default function Header() {
       <header className="sticky top-0 z-10 bg-pure/80 dark:bg-black/30 backdrop-blur border-b border-black/10 dark:border-white/10">
         <div className="w-full px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex items-center">
           <Link href="/" aria-label="Home" className="flex items-center gap-3">
-            <Image
+            <img
               src="/logo.png"
-              alt=""
+              alt="Alliger's logo"
               width={56}
               height={56}
-              priority
               className="h-12 w-12 sm:h-14 sm:w-14"
+              loading="eager"
             />
             <div className="leading-tight">
               <span className="block text-2xl sm:text-4xl font-extrabold tracking-tight bg-gradient-to-r from-maroon via-fire to-rooster bg-clip-text text-transparent">
@@ -190,7 +190,7 @@ export default function Header() {
       >
         <div className="p-4 flex items-center justify-between border-b border-black/10 dark:border-white/10">
           <div className="flex items-center gap-2">
-            <Image
+            <img
               src="/logo.png"
               alt=""
               width={28}

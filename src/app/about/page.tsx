@@ -21,7 +21,7 @@ export default function AboutPage() {
 
                         <figure className="mt-8 rounded-xl overflow-hidden border border-foreground/10 bg-foreground/[0.03]">
                             <div className="relative w-full aspect-[16/8] sm:aspect-[16/6]">
-                                <Image
+                                <img
                                     src="/images/house-wings.jpg"
                                     alt="Alliger's House of Wings exterior"
                                     fill

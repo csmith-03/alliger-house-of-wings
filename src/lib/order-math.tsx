@@ -58,11 +58,18 @@ export function sanitizeLine(raw: CartLine) {
       0,
     ),
   );
+
+  const image =
+    (pickFirst(raw, ["image", "imageUrl", "imageURL", "img"], null) as
+      | string
+      | null) || null;
+
   return {
     id,
     name,
     quantity,
     unitAmount,
+    image,
     weightOz: toInt(
       pickFirst(raw, ["weightOz", "weight_oz", "weight", "oz"], 0),
       0,

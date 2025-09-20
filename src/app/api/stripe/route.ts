@@ -52,9 +52,17 @@ export async function POST(req: Request) {
         subtotal: String(base.subtotal),
         shipping: String(ship),
         tax: String(tax),
-        total: String(amount),
         rate_id: rateId || "",
-        cart: JSON.stringify(safeItems).slice(0, 4900),
+        cart: JSON.stringify(
+          (safeItems as Array<Record<string, any>>).map((it) => ({
+            id: it.productId ?? it.id, // id for display
+            productId: it.productId ?? it.id, // canonical id
+            name: it.name ?? "",
+            quantity: Number(it.qty ?? it.quantity ?? 1),
+            unitAmount: Number(it.price ?? it.unitAmount ?? 0),
+            image: it.image ?? null, // <-- include image
+          })),
+        ).slice(0, 4900),
       },
     });
 

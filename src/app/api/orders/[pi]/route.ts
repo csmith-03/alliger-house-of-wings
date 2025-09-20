@@ -1,19 +1,44 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, { apiVersion: "2024-06-20" });
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
+  apiVersion: "2024-06-20",
+});
 
 export async function GET(_: Request, { params }: { params: { pi: string } }) {
   try {
     const piId = params.pi;
-    if (!piId) return NextResponse.json({ error: "missing pi" }, { status: 400 });
+    if (!piId)
+      return NextResponse.json({ error: "missing pi" }, { status: 400 });
 
-    const pi = await stripe.paymentIntents.retrieve(piId, { expand: ["shipping"] });
+    const pi = await stripe.paymentIntents.retrieve(piId, {
+      expand: ["shipping"],
+    });
 
-    // Pull out the fields we displayed earlier
     const md = pi.metadata || {};
-    let cartParsed: any[] = [];
-    try { cartParsed = md.cart ? JSON.parse(md.cart) : []; } catch {}
+    let cartParsed: Array<{
+      id: string;
+      name: string;
+      quantity: number;
+      unitAmount: number;
+      image?: string | null;
+    }> = [];
+
+    try {
+      const raw = String(md.cart ?? "[]");
+      const arr = JSON.parse(raw);
+      if (Array.isArray(arr)) {
+        cartParsed = arr.map((x: any) => ({
+          id: String(x.productId ?? x.id ?? ""),
+          name: String(x.name ?? ""),
+          quantity: Number(x.quantity ?? x.qty ?? 1),
+          unitAmount: Number(x.unitAmount ?? x.price ?? 0),
+          image: x.image ?? null,
+        }));
+      }
+    } catch {
+      cartParsed = [];
+    }
 
     return NextResponse.json({
       id: pi.id,
@@ -29,6 +54,9 @@ export async function GET(_: Request, { params }: { params: { pi: string } }) {
     });
   } catch (err: any) {
     console.error(err);
-    return NextResponse.json({ error: err?.message ?? "failed" }, { status: 500 });
+    return NextResponse.json(
+      { error: err?.message ?? "failed" },
+      { status: 500 },
+    );
   }
 }

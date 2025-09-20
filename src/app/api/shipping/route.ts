@@ -1,33 +1,56 @@
-// src/app/api/shipping/route.ts
 import { NextResponse } from "next/server";
+
+export const runtime = "nodejs";
 
 const ORIGIN = {
   name: "Alliger House of Wings",
-  street1: process.env.SHIP_FROM_STREET!,
-  city: process.env.SHIP_FROM_CITY!,
-  state: process.env.SHIP_FROM_STATE!,
-  zip: process.env.SHIP_FROM_ZIP!,
+  street1: process.env.SHIP_FROM_STREET || "",
+  city: process.env.SHIP_FROM_CITY || "",
+  state: process.env.SHIP_FROM_STATE || "",
+  zip: process.env.SHIP_FROM_ZIP || "",
   country: "US",
-  phone: process.env.SHIP_FROM_PHONE ?? undefined,
-  email: process.env.SHIP_FROM_EMAIL ?? undefined,
+  phone: process.env.SHIP_FROM_PHONE || undefined,
+  email: process.env.SHIP_FROM_EMAIL || undefined,
 };
 
 export async function POST(req: Request) {
   try {
-    const { toAddress, items } = await req.json();
+    const body = await req.json();
 
-    const totalWeightOz = (items ?? []).reduce(
-      (sum: number, li: any) =>
-        sum + Number(li.weightOz || 0) * Math.max(1, Number(li.quantity || 0)),
-      0,
-    );
+    // Accept both shapes just in case
+    let addr =
+      body?.address ?? body?.toAddress ?? body?.addr ?? body?.address_to ?? {};
+
+    if (addr?.address) addr = addr.address;
+
+    const toAddress = {
+      name: body?.name || addr?.name || "",
+      street1: addr?.line1 || "",
+      street2: addr?.line2 || "",
+      city: addr?.city || "",
+      state: addr?.state || "",
+      zip: addr?.postal_code || addr?.postalCode || "",
+      country: (addr?.country || "US").toUpperCase(),
+    };
+
+    // Basic guard: only US for now; require ZIP
+    if (toAddress.country !== "US" || !toAddress.zip) {
+      return NextResponse.json({ rates: [] }, { status: 200 });
+    }
+
+    const items: any[] = Array.isArray(body?.items) ? body.items : [];
+    const totalWeightOz = items.reduce((sum, li) => {
+      const qty = Math.max(1, Number(li?.quantity ?? li?.qty ?? 1));
+      const oz = Number(li?.weightOz ?? 0);
+      return sum + qty * oz;
+    }, 0);
 
     const parcel = {
       length: 8,
       width: 6,
       height: 4,
       distance_unit: "in",
-      weight: Math.max(totalWeightOz, 1),
+      weight: Math.max(1, Math.round(totalWeightOz || 1)),
       mass_unit: "oz",
     };
 
@@ -39,57 +62,51 @@ export async function POST(req: Request) {
       },
       body: JSON.stringify({
         address_from: ORIGIN,
-        address_to: {
-          name: toAddress?.name ?? "",
-          street1: toAddress?.line1,
-          street2: toAddress?.line2 ?? "",
-          city: toAddress?.city,
-          state: toAddress?.state,
-          zip: toAddress?.postal_code,
-          country: toAddress?.country ?? "US",
-        },
+        address_to: toAddress,
         parcels: [parcel],
         async: false,
       }),
     });
 
     if (!resp.ok) {
-      const t = await resp.text();
-      return NextResponse.json({ error: t || "Shippo error" }, { status: 400 });
-    }
-
-    const shipment = await resp.json();
-    const rates: any[] = shipment?.rates ?? [];
-
-    const uspsRates = rates
-      .filter((r) => r.currency === "USD" && r.provider === "USPS")
-      .filter((r) =>
-        [
-          "usps_ground_advantage",
-          "usps_priority",
-          "usps_priority_express",
-        ].includes(r?.servicelevel?.token),
-      )
-      .map((r) => ({
-        id: r.object_id,
-        serviceName: r.servicelevel?.name ?? r.servicelevel?.token,
-        amount: Math.round(Number(r.amount) * 100),
-        estDays: r.estimated_days,
-      }))
-      .sort((a, b) => a.amount - b.amount);
-
-    if (uspsRates.length === 0) {
+      const txt = await resp.text();
       return NextResponse.json(
-        { error: "No USPS rates available" },
-        { status: 404 },
+        { rates: [], error: txt || "Shippo error" },
+        { status: 200 },
       );
     }
 
-    return NextResponse.json({ options: uspsRates.slice(0, 3) });
+    const shipment = await resp.json();
+    const rawRates: any[] = shipment?.rates ?? [];
+
+    // Only USPS, and map to the shape the UI expects
+    const wanted = new Set([
+      "usps_ground_advantage",
+      "usps_priority",
+      "usps_priority_express",
+    ]);
+
+    const rates = rawRates
+      .filter((r) => r.currency === "USD" && r.provider === "USPS")
+      .filter((r) => wanted.has(r?.servicelevel?.token))
+      .map((r) => {
+        const est = Number(r.estimated_days) || undefined;
+        return {
+          id: String(r.object_id),
+          label: r?.servicelevel?.name || r?.servicelevel?.token || "USPS",
+          amount: Math.round(Number(r.amount) * 100), // cents
+          daysMin: est ?? 2,
+          daysMax: est ? est + 1 : 5,
+        };
+      })
+      .sort((a, b) => a.amount - b.amount);
+
+    return NextResponse.json({ rates }, { status: 200 });
   } catch (e: any) {
+    console.error("[/api/shipping] error:", e?.message);
     return NextResponse.json(
-      { error: e?.message || "quote failed" },
-      { status: 500 },
+      { rates: [], error: "quote failed" },
+      { status: 200 },
     );
   }
 }
