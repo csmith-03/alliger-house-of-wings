@@ -1,20 +1,57 @@
-import Stripe from "stripe";
-import { NextResponse } from "next/server";
+// API route: gets a PaymentIntent by id and returns relevant details
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20",
-});
+/**
+ * GET /api/orders/[pi]
+ *
+ * Input:
+ *   - pi (string): PaymentIntent ID, passed as a route parameter
+ *
+ * Behavior:
+ *   - Retrieves the PaymentIntent from Stripe (expands shipping info)
+ *   - Extracts relevant metadata (subtotal, shipping, tax, rate_id)
+ *   - Parses and normalizes the "cart" array from metadata
+ *
+ * Output (200 OK):
+ *   {
+ *     id: string,               // Stripe PaymentIntent id
+ *     amount: number,           // total amount in minor units (cents)
+ *     currency: string,         // currency code (e.g., "usd")
+ *     shipping: object|null,    // shipping { name, address } if present
+ *     subtotal: number,         // subtotal in cents
+ *     shipping_cents: number,   // shipping charge in cents
+ *     tax: number,              // tax in cents
+ *     rate_id: string,          // selected shipping rate id
+ *     cart: Array<{             // parsed cart items from metadata
+ *       id: string,
+ *       name: string,
+ *       quantity: number,
+ *       unitAmount: number,
+ *       image?: string|null
+ *     }>,
+ *     status: string            // Stripe PaymentIntent status
+ *   }
+ *
+ * Errors:
+ *   - 400 if pi param is missing
+ *   - 500 for Stripe or parsing errors
+ */
+
+import { NextResponse } from "next/server";
+import { stripe } from "@/lib/stripe";
 
 export async function GET(_: Request, { params }: { params: { pi: string } }) {
   try {
+    // extract payment intent id from route params
     const piId = params.pi;
     if (!piId)
       return NextResponse.json({ error: "missing pi" }, { status: 400 });
 
+    // retrieve the PaymentIntent from Stripe, include shipping info
     const pi = await stripe.paymentIntents.retrieve(piId, {
       expand: ["shipping"],
     });
 
+    // parse metadata and cart details
     const md = pi.metadata || {};
     let cartParsed: Array<{
       id: string;
@@ -25,8 +62,11 @@ export async function GET(_: Request, { params }: { params: { pi: string } }) {
     }> = [];
 
     try {
+      // parse metadata.cart that is stored as JSON
       const raw = String(md.cart ?? "[]");
       const arr = JSON.parse(raw);
+
+      // normalize each item into a predictable shape
       if (Array.isArray(arr)) {
         cartParsed = arr.map((x: any) => ({
           id: String(x.productId ?? x.id ?? ""),
@@ -37,9 +77,11 @@ export async function GET(_: Request, { params }: { params: { pi: string } }) {
         }));
       }
     } catch {
+      // return empty cart if parsing fails
       cartParsed = [];
     }
 
+    // return response object with important PaymentIntent info
     return NextResponse.json({
       id: pi.id,
       amount: pi.amount,
