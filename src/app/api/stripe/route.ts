@@ -1,10 +1,43 @@
-import Stripe from "stripe";
+/**
+ * POST /api/stripe
+ *
+ * Input (JSON body):
+ *   {
+ *     items: CartLine[],     // cart items with id, name, qty, price, etc.
+ *     currency?: string,     // currency code, defaults to "usd"
+ *     shipCents?: number,    // shipping cost in cents
+ *     address?: {            // optional shipping address
+ *       name?: string,
+ *       line1?: string,
+ *       line2?: string,
+ *       city?: string,
+ *       state?: string,
+ *       postal_code?: string,
+ *       country?: string
+ *     },
+ *     rateId?: string        // optional shipping rate id
+ *   }
+ *
+ * Behavior:
+ *   - Sanitizes cart items and computes subtotal.
+ *   - Validates/rounds shipping cost and calculates tax estimate.
+ *   - Ensures total amount is an integer >= 50 cents (Stripe requirement).
+ *   - Creates a PaymentIntent with automatic payment methods.
+ *   - Embeds metadata (subtotal, shipping, tax, rate_id, cart JSON).
+ *
+ * Output (200 OK):
+ *   {
+ *     clientSecret: string   // Stripe client_secret for the PaymentIntent
+ *   }
+ *
+ * Errors:
+ *   - 500 with { error } if Stripe or calculation fails.
+ */
+
 import { NextResponse } from "next/server";
 import { breakdown, sanitize, estimateTax, CartLine } from "@/lib/order-math";
+import { stripe } from "@/lib/stripe";
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20",
-});
 
 export async function POST(req: Request) {
   try {
@@ -29,7 +62,7 @@ export async function POST(req: Request) {
     });
     const total = base.subtotal + ship + tax;
 
-    const amount = Math.max(50, Math.round(total)); // Stripe wants integer >= min
+    const amount = Math.max(50, Math.round(total));
 
     const pi = await stripe.paymentIntents.create({
       amount,
@@ -60,7 +93,7 @@ export async function POST(req: Request) {
             name: it.name ?? "",
             quantity: Number(it.qty ?? it.quantity ?? 1),
             unitAmount: Number(it.price ?? it.unitAmount ?? 0),
-            image: it.image ?? null, // <-- include image
+            image: it.image ?? null, // include image
           })),
         ).slice(0, 4900),
       },

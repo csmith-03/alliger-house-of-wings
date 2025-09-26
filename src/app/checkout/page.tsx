@@ -1,3 +1,23 @@
+/**
+ * Checkout Page
+ *
+ * Flow (three phases):
+ *   1) Address: user enters and confirms shipping address (Stripe AddressElement).
+ *   2) Shipping: we POST /api/shipping with { address, items } to fetch USPS rates; user picks one.
+ *   3) Payment: we POST /api/stripe with { items, currency, shipCents, address, rateId } to create a PaymentIntent,
+ *      then render <PaymentElement> and confirm the payment (redirect).
+ *
+ * State overview:
+ *   - addr / addrComplete / addrConfirmed / editingAddress: address capture + confirmation.
+ *   - shipOpts / chosen / busyRates: shipping quotes and selection.
+ *   - clientSecret / uiErr: PaymentIntent lifecycle + UI error surface.
+ *
+ * Rendering strategy:
+ *   - Keep <Elements> mounted; once clientSecret exists, we pass it via options to render PaymentElement.
+ *   - Right-hand OrderSummary recomputes subtotals/tax and shows selected shipping if present.
+ */
+
+// TODO: split up into sub-components
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -15,6 +35,7 @@ import {
 import { useCart } from "@/app/cart-provider";
 import { sanitize, breakdown, estimateTax, money } from "@/lib/order-math";
 
+// one-time Stripe loader for client
 const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
 );
@@ -22,18 +43,18 @@ const stripePromise = loadStripe(
 export default function CheckoutPage() {
   const { items, currency } = useCart();
 
-  // Normalize cart and compute base totals (no destination tax/shipping yet)
+  // normalize cart and compute base totals (no destination tax/shipping yet)
   const norm = useMemo(() => sanitize(items), [items]);
   const base = useMemo(() => breakdown(norm, 0), [norm]);
   const cartDisabled = norm.length === 0 || base.subtotal <= 0;
 
-  // Stripe currency
+  // stripe currency
   const safeCurrency =
     typeof currency === "string" && currency.trim()
       ? currency.toLowerCase()
       : "usd";
 
-  // Address / shipping state
+  // address + shipping state
   const [addr, setAddr] = useState<any | null>(null);
   const [addrComplete, setAddrComplete] = useState(false);
   const [addrConfirmed, setAddrConfirmed] = useState(false);
@@ -43,11 +64,11 @@ export default function CheckoutPage() {
   const [chosen, setChosen] = useState<any | null>(null);
   const [busyRates, setBusyRates] = useState(false);
 
-  // PaymentIntent state
+  // Stripe PaymentIntent (created when address and rate are ready)
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [uiErr, setUiErr] = useState<string | null>(null);
 
-  // Fetch USPS rates after confirming address
+  // Phase 2: fetch USPS rates after confirming address
   useEffect(() => {
     if (!addrConfirmed || !addr || cartDisabled) return;
     let cancelled = false;
@@ -57,6 +78,7 @@ export default function CheckoutPage() {
         setBusyRates(true);
         setUiErr(null);
 
+        // get USPS rates based on current address + cart from API
         const res = await fetch("/api/shipping", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -66,6 +88,7 @@ export default function CheckoutPage() {
         if (!res.ok) throw new Error(data?.error || "Failed to fetch rates.");
         if (cancelled) return;
 
+        // populate shipping options ()keep prior selection if present, otherwise pick first)
         setShipOpts(data?.rates ?? []);
         setChosen((prev) => prev ?? data?.rates?.[0] ?? null);
       } catch (e: any) {
@@ -80,7 +103,7 @@ export default function CheckoutPage() {
     };
   }, [addrConfirmed, addr, JSON.stringify(norm), cartDisabled]);
 
-  // Create/refresh PaymentIntent once address + rate are ready
+  // Phase 3: create/refresh PaymentIntent once address + rate are ready
   useEffect(() => {
     const ready = addrConfirmed && !!addr && !!chosen && !cartDisabled;
     if (!ready) return;
@@ -89,7 +112,11 @@ export default function CheckoutPage() {
     (async () => {
       try {
         setUiErr(null);
+
+        // normalize shipping cents to match UI
         const shipCents = Math.max(0, Math.round(Number(chosen!.amount) || 0));
+
+        // create PaymentIntent for full amount (subtotal + ship + tax)
         const res = await fetch("/api/stripe", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -105,6 +132,7 @@ export default function CheckoutPage() {
         if (!res.ok || !data?.clientSecret) {
           throw new Error(data?.error || "Couldn't start payment.");
         }
+        // store clientSecret so <Elements> can render <PaymentElement>
         if (!cancelled) setClientSecret(data.clientSecret);
       } catch (e: any) {
         if (!cancelled) setUiErr(e?.message || "Payment setup failed.");
@@ -126,20 +154,22 @@ export default function CheckoutPage() {
     cartDisabled,
   ]);
 
-  // Keep <Elements> stable until PI exists (prevents address form reset)
+  // keep <Elements> stable until PI exists (prevents address form reset)
   const elementsOptions = useMemo(() => {
     return clientSecret
       ? { clientSecret, appearance: { labels: "floating" as const } }
       : {
+          // let Address/Shipping render before PI exists
           mode: "payment" as const,
           currency: safeCurrency,
           amount: Math.max(50, base.total),
           appearance: { labels: "floating" as const },
         };
   }, [clientSecret, safeCurrency, base.total]);
+  // change key - forces Elements to remount when PI is available
   const elementsKey = clientSecret ? `cs_${clientSecret}` : "deferred";
 
-  // Shipping label logic for OrderSummary
+  // shipping label logic for OrderSummary
   type ShipPhase = "beforeAddress" | "selectRate" | "ready";
   const shippingPhase: ShipPhase = !addrConfirmed
     ? "beforeAddress"
@@ -147,12 +177,14 @@ export default function CheckoutPage() {
       ? "ready"
       : "selectRate";
 
+  // normalize shipping cents for summary (null when N/A)
   const selectedShipping: number | null =
     shippingPhase === "ready"
       ? Math.max(0, Math.round(Number(chosen!.amount) || 0))
       : null;
 
-  // Address-aware tax preview
+  // address-aware tax preview
+  // TODO: integrate Stripe Tax and fix this
   const taxPreview =
     addrConfirmed && addr
       ? estimateTax({
@@ -177,6 +209,8 @@ export default function CheckoutPage() {
             >
               <CheckoutFlowUI
                 cartDisabled={cartDisabled}
+
+                // address properties
                 addr={addr}
                 addrComplete={addrComplete}
                 addrConfirmed={addrConfirmed}
@@ -186,7 +220,7 @@ export default function CheckoutPage() {
                   setAddrComplete(complete);
                 }}
                 onConfirmAddress={() => {
-                  if (!addrComplete) return;
+                  if (!addrComplete) return; // require form to be completed
                   setAddrConfirmed(true);
                   setEditingAddress(false);
                   setUiErr(null);
@@ -194,6 +228,7 @@ export default function CheckoutPage() {
                   setChosen(null);
                   setClientSecret(null);
                 }}
+                // going back to edit address clears quotes, selection, PI
                 onEditAddress={() => {
                   setEditingAddress(true);
                   setAddrConfirmed(false);
@@ -201,17 +236,20 @@ export default function CheckoutPage() {
                   setChosen(null);
                   setClientSecret(null);
                 }}
+                // shipping properties
                 shipOpts={shipOpts}
                 chosen={chosen}
                 setChosen={(opt) => setChosen(opt)}
                 busyRates={busyRates}
+
+                // payment UI status
                 uiErr={uiErr}
                 hasClientSecret={!!clientSecret}
               />
             </Elements>
           </section>
 
-          {/* RIGHT: aligned cards with the same outline + padding */}
+          {/* RIGHT: Summary and cart items */}
           <aside className="lg:col-span-1 space-y-4">
             <OrderSummary
               subtotal={base.subtotal}
@@ -258,8 +296,10 @@ function CheckoutFlowUI(props: {
   const elements = useElements();
   const router = useRouter();
 
+  // can't confirm address until it's complete and we're not fetching rates
   const canConfirmAddress = props.addrComplete && !props.busyRates;
 
+  // Submit payment handler to Stripe, redirect to confirmation page
   async function handlePay() {
     if (!stripe || !elements) return;
 
@@ -269,7 +309,7 @@ function CheckoutFlowUI(props: {
         return_url: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/checkout/confirmation`,
       },
     });
-
+    // Stripe didn't redirect (an error occurred)
     if (error) {
       console.error(error);
       alert(error.message || "Payment failed. Please try again.");
@@ -289,12 +329,13 @@ function CheckoutFlowUI(props: {
                 mode: "shipping",
                 allowedCountries: ["US"],
                 fields: { phone: "never" },
-                // keeps the full form open (optional)
+                // keeps the full form open (optional - can change)
                 defaultValues: {
                   address: { country: "US", state: "NY" },
                 },
               }}
               onChange={(e) => {
+                // flatten nested address for the state we use
                 const a = e.value?.address || {};
                 const flat = {
                   name: e.value?.name || "",
@@ -325,7 +366,7 @@ function CheckoutFlowUI(props: {
             </div>
           </>
         ) : (
-          // Read-only summary with edit
+          // read-only summary with edit
           <div className="space-y-2">
             <div className="rounded-md border p-3 bg-neutral-50 text-sm">
               <div>{props.addr?.name}</div>

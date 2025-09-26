@@ -1,5 +1,4 @@
-import Stripe from "stripe";
-import { stripe } from "./stripeclient";
+import { stripe } from "@/lib/stripe";
 
 const BAR: Record<string,string> = { maroon:"bg-maroon", fire:"bg-fire", rooster:"bg-rooster" };
 
@@ -15,7 +14,6 @@ export interface SauceItem {
 }
 
 export async function getSauceProducts(): Promise<SauceItem[]> {
-  console.log("[getSauceProducts] start");
   let products: Stripe.ApiList<Stripe.Product>;
   try {
     products = await stripe.products.list({
@@ -24,11 +22,9 @@ export async function getSauceProducts(): Promise<SauceItem[]> {
       expand: ["data.default_price"],
     });
   } catch (e) {
-    console.error("[getSauceProducts] stripe.products.list error:", e);
     return [];
   }
 
-  console.log("[getSauceProducts] fetched count:", products.data.length);
 
   const mapped = products.data.map(p => {
     const defaultPrice = p.default_price as Stripe.Price | null;
@@ -45,6 +41,5 @@ export async function getSauceProducts(): Promise<SauceItem[]> {
     };
   });
 
-  console.log("[getSauceProducts] mapped items:", mapped.length);
   return mapped;
 }

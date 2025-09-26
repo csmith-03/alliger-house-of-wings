@@ -1,9 +1,30 @@
-// Server component that renders the order confirmation screen
+/**
+ * ConfirmationPage (Server Component)
+ *
+ * Purpose:
+ *   - Show the order confirmation after Stripe redirects back.
+ *   - Reads the PaymentIntent id from the URL (Stripe may send `payment_intent`).
+ *   - Fetches normalized order details from our API: /api/orders/[pi]
+ *   - Clears any lingering cart state via <ClearCartOnArrival /> (client side).
+ *
+ * Input:
+ *   - searchParams: { pi?: string; payment_intent?: string }
+ *
+ * Behavior:
+ *   - If no PI is present or the lookup fails, render a friendly "not found" state.
+ *   - When available, render shipping address, purchased items, and a totals summary.
+ *
+ * Notes:
+ *   - This is a **server component**; it renders once with data from the server.
+ *   - Uses `cache: "no-store"` to ensure we always read the latest order.
+ */
+
 import Link from "next/link";
 import ClearCartOnArrival from "./ClearCartOnArrival";
 
 type Props = { searchParams: { pi?: string; payment_intent?: string } };
 
+// fetches order JSON for a given PaymentIntent id
 async function getOrder(pi: string) {
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/api/orders/${pi}`,
@@ -15,6 +36,7 @@ async function getOrder(pi: string) {
 }
 
 export default async function ConfirmationPage({ searchParams }: Props) {
+  // Stripe could send `payment_intent` or `pi` in the return_url
   const pi = searchParams.pi || searchParams.payment_intent || "";
   if (!pi) {
     return (
@@ -31,6 +53,7 @@ export default async function ConfirmationPage({ searchParams }: Props) {
     );
   }
 
+  // load order details with the PaymentIntent
   const order = await getOrder(pi);
   if (!order) {
     return (
@@ -44,6 +67,7 @@ export default async function ConfirmationPage({ searchParams }: Props) {
     );
   }
 
+  // destructure fields returned by our /api/orders route
   const {
     id,
     amount,
@@ -59,6 +83,7 @@ export default async function ConfirmationPage({ searchParams }: Props) {
     (Math.max(0, Math.round(cents)) / 100).toFixed(2);
   const shortId = id?.slice(-6)?.toUpperCase() ?? "—";
 
+  // items captured from metadata on the PaymentIntent
   const items: Array<{
     id: string;
     name: string;
@@ -107,6 +132,7 @@ export default async function ConfirmationPage({ searchParams }: Props) {
             ) : (
               <ul className="divide-y">
                 {items.map((it) => {
+                  // calculate line total in cents
                   const unit = Math.max(
                     0,
                     Math.round(Number(it.unitAmount) || 0),

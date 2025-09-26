@@ -1,3 +1,49 @@
+/**
+ * POST /api/shipping
+ *
+ * Input (JSON body):
+ *   {
+ *     address | toAddress | addr | address_to: {
+ *       name?: string,
+ *       line1?: string,
+ *       line2?: string,
+ *       city?: string,
+ *       state?: string,
+ *       postal_code?: string,
+ *       country?: string
+ *     },
+ *     items: Array<{
+ *       quantity?: number,
+ *       qty?: number,
+ *       weightOz?: number
+ *     }>
+ *   }
+ *
+ * Behavior:
+ *   - Normalizes destination address (accepts multiple field names).
+ *   - Only supports US addresses; requires ZIP code.
+ *   - Computes total package weight in ounces from items.
+ *   - Builds a parcel with fixed dimensions.
+ *   - Calls Shippo API to create a shipment and get rates.
+ *   - Filters for USPS services (ground, priority, express).
+ *   - Returns rates in cents, sorted by price, with estimated days.
+ *
+ * Output (200 OK):
+ *   {
+ *     rates: Array<{
+ *       id: string,       // Shippo object_id
+ *       label: string,    // service name
+ *       amount: number,   // price in cents
+ *       daysMin: number,  // estimated minimum days
+ *       daysMax: number   // estimated maximum days
+ *     }>
+ *   }
+ *
+ * Errors:
+ *   - Returns { rates: [] } if invalid input, non-US, or Shippo error.
+ *   - Logs errors server-side for debugging.
+ */
+
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -17,7 +63,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
-    // Accept both shapes just in case
+    // normalize destination address from multiple possible options
     let addr =
       body?.address ?? body?.toAddress ?? body?.addr ?? body?.address_to ?? {};
 
@@ -33,11 +79,12 @@ export async function POST(req: Request) {
       country: (addr?.country || "US").toUpperCase(),
     };
 
-    // Basic guard: only US for now; require ZIP
+    // only for US now
     if (toAddress.country !== "US" || !toAddress.zip) {
       return NextResponse.json({ rates: [] }, { status: 200 });
     }
 
+    // compute total weight in ounces
     const items: any[] = Array.isArray(body?.items) ? body.items : [];
     const totalWeightOz = items.reduce((sum, li) => {
       const qty = Math.max(1, Number(li?.quantity ?? li?.qty ?? 1));
@@ -45,6 +92,7 @@ export async function POST(req: Request) {
       return sum + qty * oz;
     }, 0);
 
+    // fixed parcel dimensions for now
     const parcel = {
       length: 8,
       width: 6,
@@ -54,6 +102,7 @@ export async function POST(req: Request) {
       mass_unit: "oz",
     };
 
+    // Call Shippo API to create shipment and get rates
     const resp = await fetch("https://api.goshippo.com/shipments/", {
       method: "POST",
       headers: {
@@ -79,13 +128,14 @@ export async function POST(req: Request) {
     const shipment = await resp.json();
     const rawRates: any[] = shipment?.rates ?? [];
 
-    // Only USPS, and map to the shape the UI expects
+    // only return USPS shipping options
     const wanted = new Set([
       "usps_ground_advantage",
       "usps_priority",
       "usps_priority_express",
     ]);
 
+    // filter/normalize rates into format that's compatible with the UI
     const rates = rawRates
       .filter((r) => r.currency === "USD" && r.provider === "USPS")
       .filter((r) => wanted.has(r?.servicelevel?.token))
