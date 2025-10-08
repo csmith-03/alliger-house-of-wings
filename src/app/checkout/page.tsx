@@ -22,9 +22,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
+import { Pencil, Loader2 } from "lucide-react";
+import { getThemeClasses } from "@/components/class-themes";
 import CartItems from "@/components/cart/CartItems";
 import OrderSummary from "@/components/cart/OrderSummary";
 import { useRouter } from "next/navigation";
+import { useTheme } from "@/app/theme-provider";
 import {
   Elements,
   AddressElement,
@@ -34,6 +37,7 @@ import {
 } from "@stripe/react-stripe-js";
 import { useCart } from "@/app/cart-provider";
 import { sanitize, breakdown, estimateTax, money } from "@/lib/order-math";
+import { text } from "stream/consumers";
 
 // one-time Stripe loader for client
 const stripePromise = loadStripe(
@@ -42,7 +46,8 @@ const stripePromise = loadStripe(
 
 export default function CheckoutPage() {
   const { items, currency } = useCart();
-
+  const { theme } = useTheme?.() || { theme: "dark" };
+  
   // normalize cart and compute base totals (no destination tax/shipping yet)
   const norm = useMemo(() => sanitize(items), [items]);
   const base = useMemo(() => breakdown(norm, 0), [norm]);
@@ -90,7 +95,7 @@ export default function CheckoutPage() {
 
         // populate shipping options ()keep prior selection if present, otherwise pick first)
         setShipOpts(data?.rates ?? []);
-        setChosen((prev) => prev ?? data?.rates?.[0] ?? null);
+        setChosen((prev: any) => prev ?? data?.rates?.[0] ?? null);
       } catch (e: any) {
         if (!cancelled) setUiErr(e?.message || "Could not get rates.");
       } finally {
@@ -153,21 +158,32 @@ export default function CheckoutPage() {
     safeCurrency,
     cartDisabled,
   ]);
-
+  
   // keep <Elements> stable until PI exists (prevents address form reset)
   const elementsOptions = useMemo(() => {
-    return clientSecret
-      ? { clientSecret, appearance: { labels: "floating" as const } }
-      : {
-          // let Address/Shipping render before PI exists
-          mode: "payment" as const,
-          currency: safeCurrency,
-          amount: Math.max(50, base.total),
-          appearance: { labels: "floating" as const },
-        };
-  }, [clientSecret, safeCurrency, base.total]);
+  const appearance = {
+    theme: theme === "dark" ? "night" as const : "stripe" as const,
+    labels: "floating" as const,
+    variables: {
+      colorPrimary: theme === "dark" ? "#e0e0e0" : "#202020",
+      colorBackground: theme === "dark" ? "#121212" : "#ffffff",
+      colorText: theme === "dark" ? "#e0e0e0" : "#202020",
+      colorDanger: "#df1b41",
+      fontFamily: '"Inter", sans-serif',
+    }
+  };
+
+  return clientSecret
+    ? { clientSecret, appearance }
+    : {
+        mode: "payment" as const,
+        currency: safeCurrency,
+        amount: Math.max(50, base.total),
+        appearance,
+      };
+}, [clientSecret, safeCurrency, base.total, theme]);
   // change key - forces Elements to remount when PI is available
-  const elementsKey = clientSecret ? `cs_${clientSecret}` : "deferred";
+  const elementsKey = `${theme}_${clientSecret ? `cs_${clientSecret}` : "deferred"}`;
 
   // shipping label logic for OrderSummary
   type ShipPhase = "beforeAddress" | "selectRate" | "ready";
@@ -209,7 +225,6 @@ export default function CheckoutPage() {
             >
               <CheckoutFlowUI
                 cartDisabled={cartDisabled}
-
                 // address properties
                 addr={addr}
                 addrComplete={addrComplete}
@@ -241,7 +256,6 @@ export default function CheckoutPage() {
                 chosen={chosen}
                 setChosen={(opt) => setChosen(opt)}
                 busyRates={busyRates}
-
                 // payment UI status
                 uiErr={uiErr}
                 hasClientSecret={!!clientSecret}
@@ -257,11 +271,18 @@ export default function CheckoutPage() {
               chosenShippingCents={selectedShipping}
               shippingPhase={shippingPhase}
               cartDisabled={cartDisabled}
+              theme={theme}
             />
 
-            <div className="rounded-md border border-[color:var(--surface-border-strong)] bg-white p-4">
+            <div
+              className={`rounded-md border p-4 ${
+                theme === "dark"
+                  ? "border-[color:var(--surface-border-strong)] bg-[color:var(--surface)] text-[color:var(--foreground)]"
+                  : "border-[color:var(--surface-border-strong)] bg-white text-[color:var(--foreground)]"
+              }`}
+            >
               <h2 className="text-base font-semibold mb-2">Your Cart</h2>
-              <CartItems items={norm} />
+              <CartItems items={norm} theme={theme} />
             </div>
           </aside>
         </div>
@@ -295,6 +316,8 @@ function CheckoutFlowUI(props: {
   const stripe = useStripe();
   const elements = useElements();
   const router = useRouter();
+  const { theme } = useTheme?.() || { theme: "dark" };
+  const themeClass = getThemeClasses(theme);
 
   // can't confirm address until it's complete and we're not fetching rates
   const canConfirmAddress = props.addrComplete && !props.busyRates;
@@ -319,7 +342,7 @@ function CheckoutFlowUI(props: {
   return (
     <form className="space-y-4">
       {/* Shipping Address */}
-      <section className="rounded-md border border-[color:var(--surface-border-strong)] bg-white p-4">
+      <section className={`rounded-md border p-4 ${themeClass.surface}`}>
         <h2 className="text-lg font-semibold mb-3">Shipping Address</h2>
 
         {props.editingAddress ? (
@@ -355,10 +378,8 @@ function CheckoutFlowUI(props: {
                 type="button"
                 disabled={!canConfirmAddress}
                 onClick={props.onConfirmAddress}
-                className={`rounded-md px-3 py-2 text-white ${
-                  !canConfirmAddress
-                    ? "bg-gray-400"
-                    : "bg-[#7a0d0d] hover:brightness-110"
+                className={`rounded-md px-3 py-2 font-semibold ${themeClass.buttonPrimary} ${
+                  !canConfirmAddress ? "opacity-60 cursor-not-allowed" : ""
                 }`}
               >
                 {props.busyRates ? "Checking rates…" : "Confirm address"}
@@ -368,7 +389,9 @@ function CheckoutFlowUI(props: {
         ) : (
           // read-only summary with edit
           <div className="space-y-2">
-            <div className="rounded-md border p-3 bg-neutral-50 text-sm">
+            <div
+              className={`relative rounded-md border p-3 text-sm ${themeClass.muted} ${themeClass.border}`}
+            >
               <div>{props.addr?.name}</div>
               <div>{props.addr?.line1}</div>
               {props.addr?.line2 ? <div>{props.addr?.line2}</div> : null}
@@ -377,28 +400,39 @@ function CheckoutFlowUI(props: {
                 {props.addr?.postal_code}
               </div>
               <div>{props.addr?.country || "US"}</div>
+              <button
+                type="button"
+                onClick={props.onEditAddress}
+                aria-label="Edit address"
+                className="absolute top-2 right-2 inline-flex items-center justify-center rounded-full p-2 hover:bg-[color:var(--surface-alt)] transition"
+              >
+                <Pencil
+                  className={`h-4 w-4 ${
+                    theme === "dark" ? "text-gray-300" : "text-gray-600"
+                  }`}
+                />
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={props.onEditAddress}
-              className="rounded-md px-3 py-2 border hover:bg-neutral-50"
-            >
-              Edit address
-            </button>
           </div>
         )}
       </section>
 
       {/* USPS shipping options */}
-      <section className="rounded-md border border-[color:var(--surface-border-strong)] bg-white p-4">
+      <section className={`rounded-md border p-4 ${themeClass.surface}`}>
         <h2 className="text-lg font-semibold mb-2">USPS Shipping</h2>
 
         {!props.addrConfirmed ? (
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-foreground/60">
             Confirm your address to see USPS options.
           </p>
         ) : props.busyRates ? (
-          <p className="text-sm text-gray-600">Fetching rates…</p>
+          <div className="flex justify-center items-center py-8">
+            <Loader2
+              className={`animate-spin h-8 w-8 ${
+                theme === "dark" ? "text-gray-300" : "text-gray-600"
+              }`}
+            />
+          </div>
         ) : props.shipOpts.length === 0 ? (
           <p className="text-sm text-red-600">
             No rates available. Try editing your address.
@@ -408,7 +442,7 @@ function CheckoutFlowUI(props: {
             {props.shipOpts.map((opt) => (
               <label
                 key={opt.id}
-                className="flex items-center justify-between rounded-md border p-3 text-sm hover:bg-neutral-50"
+                className={`flex items-center justify-between rounded-md border p-3 text-sm hover:bg-[color:var(--surface-muted)] ${themeClass.surface} ${themeClass.border}`}
               >
                 <div className="flex items-center gap-3">
                   <input
@@ -416,10 +450,13 @@ function CheckoutFlowUI(props: {
                     name="ship"
                     checked={props.chosen?.id === opt.id}
                     onChange={() => props.setChosen(opt)}
+                    style={{
+                      accentColor: theme === "dark" ? "#dfa32e" : "#7a0d0d",
+                    }}
                   />
                   <div>
                     <div className="font-medium">{opt.label}</div>
-                    <div className="text-gray-600">
+                    <div className={themeClass.textMuted}>
                       {opt.daysMin}–{opt.daysMax} days
                     </div>
                   </div>
@@ -434,7 +471,7 @@ function CheckoutFlowUI(props: {
       {/* Payment */}
       {props.hasClientSecret ? (
         <>
-          <section className="rounded-md border border-[color:var(--surface-border-strong)] bg-white p-4">
+          <section className={`rounded-md border p-4 ${themeClass.surface}`}>
             <h3 className="text-lg font-semibold mb-2">Payment</h3>
             <PaymentElement />
           </section>
@@ -456,7 +493,9 @@ function CheckoutFlowUI(props: {
           {props.addrConfirmed &&
             props.shipOpts.length > 0 &&
             !props.busyRates && (
-              <p className="text-sm text-gray-600">Preparing secure payment…</p>
+              <p className={`text-sm ${themeClass.textMuted}`}>
+                Preparing secure payment…
+              </p>
             )}
         </>
       )}

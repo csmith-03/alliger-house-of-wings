@@ -11,6 +11,7 @@ type Props = {
   shippingPhase?: ShipPhase;
   cartDisabled?: boolean;
   title?: string;
+  theme?: "light" | "dark";
 };
 
 export default function OrderSummary({
@@ -20,6 +21,7 @@ export default function OrderSummary({
   shippingPhase = "beforeAddress",
   cartDisabled,
   title = "Order Summary",
+  theme = "light",
 }: Props) {
   const ship =
     typeof chosenShippingCents === "number"
@@ -37,8 +39,18 @@ export default function OrderSummary({
     shippingLabel = ship == null ? "TBD" : `$${money(ship)}`;
   }
 
+  // Theme-based classes
+  const asideCls =
+    theme === "dark"
+      ? "rounded-md border border-[color:var(--surface-border-strong)] bg-[color:var(--surface)] text-[color:var(--foreground)] p-4"
+      : "rounded-md border border-[color:var(--surface-border-strong)] bg-white text-[color:var(--foreground)] p-4";
+  const dividerCls =
+    theme === "dark"
+      ? "my-3 border-t border-[color:var(--surface-border)]"
+      : "my-3 border-t border-[color:var(--surface-border)]";
+
   return (
-    <aside className="rounded-md border border-[color:var(--surface-border-strong)] bg-white p-4">
+    <aside className={asideCls}>
       <h2 className="text-base font-semibold mb-2">{title}</h2>
 
       <dl className="space-y-2 text-sm">
@@ -57,7 +69,7 @@ export default function OrderSummary({
           <dd className="text-foreground">${money(tax)}</dd>
         </div>
 
-        <div className="my-3 border-t border-[color:var(--surface-border)]" />
+        <div className={dividerCls} />
 
         <div className="flex items-center justify-between text-base font-semibold">
           <dt>Total</dt>

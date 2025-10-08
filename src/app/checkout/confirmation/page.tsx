@@ -18,26 +18,35 @@
  *   - This is a **server component**; it renders once with data from the server.
  *   - Uses `cache: "no-store"` to ensure we always read the latest order.
  */
-
+"use client";
 import Link from "next/link";
 import ClearCartOnArrival from "./ClearCartOnArrival";
+import { getThemeClasses } from "@/components/class-themes";
+import { useTheme } from "@/app/theme-provider";
+import { getOrder } from "./getOrder";
+import { useEffect, useState } from "react";
+import React from "react";
+import { Loader2 } from "lucide-react";
 
 type Props = { searchParams: { pi?: string; payment_intent?: string } };
 
-// fetches order JSON for a given PaymentIntent id
-async function getOrder(pi: string) {
-  const res = await fetch(
-    `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/api/orders/${pi}`,
-    { cache: "no-store" },
-  ).catch(() => null);
+export default function ConfirmationPage({ searchParams }: Props) {
+  const { theme } = useTheme?.() ?? { theme: "dark" };
+  const themeClass = getThemeClasses(theme);
 
-  if (!res || !res.ok) return null;
-  return res.json();
-}
-
-export default async function ConfirmationPage({ searchParams }: Props) {
-  // Stripe could send `payment_intent` or `pi` in the return_url
   const pi = searchParams.pi || searchParams.payment_intent || "";
+  const [order, setOrder] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(!!pi);
+
+  React.useEffect(() => {
+    if (!pi) return;
+    setLoading(true);
+    getOrder(pi).then((data) => {
+      setOrder(data);
+      setLoading(false);
+    });
+  }, [pi]);
+
   if (!pi) {
     return (
       <main className="max-w-3xl mx-auto p-6">
@@ -53,8 +62,14 @@ export default async function ConfirmationPage({ searchParams }: Props) {
     );
   }
 
-  // load order details with the PaymentIntent
-  const order = await getOrder(pi);
+  if (loading) {
+  return (
+    <main className="max-w-3xl mx-auto p-6 flex flex-col items-center justify-center">
+      <Loader2 className={`animate-spin h-8 w-8 ${themeClass.textMuted}`} />
+    </main>
+  );
+}
+
   if (!order) {
     return (
       <main className="max-w-3xl mx-auto p-6">
@@ -83,7 +98,6 @@ export default async function ConfirmationPage({ searchParams }: Props) {
     (Math.max(0, Math.round(cents)) / 100).toFixed(2);
   const shortId = id?.slice(-6)?.toUpperCase() ?? "—";
 
-  // items captured from metadata on the PaymentIntent
   const items: Array<{
     id: string;
     name: string;
@@ -94,18 +108,16 @@ export default async function ConfirmationPage({ searchParams }: Props) {
 
   return (
     <main className="mx-auto max-w-4xl p-6">
-      {/* clear cart once on mount */}
       <ClearCartOnArrival />
 
       <h1 className="text-3xl font-bold mb-2">Thanks for your order!</h1>
-      <p className="text-gray-700 mb-6">
+      <p className={`${themeClass.textMuted} mb-6`}>
         Order <span className="font-mono">#{shortId}</span>
       </p>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        {/* Left: address + items */}
         <section className="lg:col-span-2 space-y-4">
-          <div className="rounded-md border border-[color:var(--surface-border-strong)] bg-white p-4">
+          <div className={`rounded-md border p-4 ${themeClass.surface}`}>
             <h2 className="text-lg font-semibold mb-3">Shipping To</h2>
             {shipping ? (
               <address className="not-italic text-sm leading-6">
@@ -121,24 +133,20 @@ export default async function ConfirmationPage({ searchParams }: Props) {
                 <div>{shipping.address.country || "US"}</div>
               </address>
             ) : (
-              <p className="text-gray-600">No shipping address found.</p>
+              <p className={themeClass.textMuted}>No shipping address found.</p>
             )}
           </div>
 
-          <div className="rounded-md border border-[color:var(--surface-border-strong)] bg-white p-4">
+          <div className={`rounded-md border p-4 ${themeClass.surface}`}>
             <h2 className="text-lg font-semibold mb-3">Items</h2>
             {items.length === 0 ? (
-              <p className="text-gray-600">No items captured.</p>
+              <p className={themeClass.textMuted}>No items captured.</p>
             ) : (
               <ul className="divide-y">
                 {items.map((it) => {
-                  // calculate line total in cents
-                  const unit = Math.max(
-                    0,
-                    Math.round(Number(it.unitAmount) || 0),
-                  );
+                  const unit = Math.max(0, Math.round(Number(it.unitAmount) || 0));
                   const qty = Math.max(1, Math.round(Number(it.quantity) || 1));
-                  const line = unit * qty; // cents
+                  const line = unit * qty;
                   return (
                     <li
                       key={it.id}
@@ -154,7 +162,7 @@ export default async function ConfirmationPage({ searchParams }: Props) {
                         ) : null}
                         <div>
                           <div className="font-medium">{it.name}</div>
-                          <div className="text-sm text-gray-600">
+                          <div className={`text-sm ${themeClass.textMuted}`}>
                             Qty: {qty}
                           </div>
                           <div className="text-xs text-gray-500">
@@ -176,15 +184,14 @@ export default async function ConfirmationPage({ searchParams }: Props) {
 
           <Link
             href="/"
-            className="inline-block rounded-md border px-4 py-2 hover:bg-neutral-50"
+            className={`inline-block rounded-md border px-4 py-2 hover:bg-[color:var(--surface-muted)] ${themeClass.surface}`}
           >
             Continue shopping
           </Link>
         </section>
 
-        {/* Right: summary */}
         <aside className="space-y-4">
-          <div className="rounded-md border border-[color:var(--surface-border-strong)] bg-white p-4">
+          <div className={`rounded-md border p-4 ${themeClass.surface}`}>
             <h2 className="text-lg font-semibold mb-3">Order Summary</h2>
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
