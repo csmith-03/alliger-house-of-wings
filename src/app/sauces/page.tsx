@@ -26,9 +26,6 @@ export default async function SaucesPage() {
             For years, our sauces have been a favorite at our Sayre, PA
             restaurant—now available online.
           </p>
-          <p className="mt-2 text-foreground/80 max-w-3xl">
-            Pulled live from Stripe (test mode).
-          </p>
 
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {items.map((p: any) => (
@@ -36,7 +33,7 @@ export default async function SaucesPage() {
                 <div className={`h-1 ${p.barClass}`} />
                 {p.image && (
                   <div className="relative w-full aspect-[4/3] overflow-hidden">
-                    <img
+                    <Image
                       src={p.image}
                       // Use a small blur placeholder optionally
                       alt={p.name}
