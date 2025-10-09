@@ -15,13 +15,13 @@ export default function AboutPage() {
                             sauces made on the premises from closely guarded family recipes.
                         </p>
 
-                        <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-maroon/10 text-maroon px-3 py-1 text-xs font-semibold">
+                        <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-maroon/10 text-rooster px-3 py-1 text-xs font-semibold">
                             26 unique wing sauce flavors
                         </div>
 
                         <figure className="mt-8 rounded-xl overflow-hidden border border-foreground/10 bg-foreground/[0.03]">
                             <div className="relative w-full aspect-[16/8] sm:aspect-[16/6]">
-                                <img
+                                <Image
                                     src="/images/house-wings.jpg"
                                     alt="Alliger's House of Wings exterior"
                                     fill

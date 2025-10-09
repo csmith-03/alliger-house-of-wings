@@ -18,7 +18,8 @@ import {
   Flame,
   HeartPulse,
   FileDown,
-  NotebookPen
+  NotebookPen,
+  Mail
 } from "lucide-react";
 
 export default function Header() {
@@ -132,6 +133,7 @@ export default function Header() {
               {navLink("/recipes", "Recipes", NotebookPen)} {/* New Recipes link */}
               {navLink("/benefits", "Benefits", HeartPulse)}
               {navLink("/about", "About", Info)}
+              {navLink("/contact", "Contact", Mail)} {/* New Contact link */}
               <CartMini />
             </div>
 
@@ -245,6 +247,13 @@ export default function Header() {
             className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5"
           >
             <Info className="h-4 w-4" /> About
+          </Link>
+          <Link
+            onClick={() => setOpen(false)}
+            href="/contact"
+            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5"
+          >
+            <Mail className="h-4 w-4" /> Contact
           </Link>
           <Link
             onClick={() => setOpen(false)}

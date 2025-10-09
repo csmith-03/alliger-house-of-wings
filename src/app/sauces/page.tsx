@@ -2,6 +2,7 @@ import Header from "../../components/header";
 import Footer from "../../components/footer";
 import { getSauceProducts } from "../../lib/productFetch";
 import Image from "next/image";
+import AddToCartButton from "../../components/add-to-cart-btn"; // <-- import the button
 
 export const metadata = { title: "Sauces" };
 export const revalidate = 300; // revalidate every 5 min (ISR).
@@ -35,7 +36,6 @@ export default async function SaucesPage() {
                   <div className="relative w-full aspect-[4/3] overflow-hidden">
                     <Image
                       src={p.image}
-                      // Use a small blur placeholder optionally
                       alt={p.name}
                       fill
                       className="object-cover transition-transform duration-300 group-hover:scale-105"
@@ -56,14 +56,16 @@ export default async function SaucesPage() {
                         ${(p.price / 100).toFixed(2)} {p.currency.toUpperCase()}
                       </span>
                     )}
-                    <a
-                      href="https://store.houseofwings.com"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="rounded-full bg-maroon text-pure px-3 py-1.5 text-sm font-medium hover:brightness-110"
-                    >
-                      Shop
-                    </a>
+                    <AddToCartButton
+                      product={{
+                        productId: p.id,
+                        priceId: p.priceId,
+                        name: p.name,
+                        price: p.price,
+                        currency: p.currency,
+                        image: p.image,
+                      }}
+                    />
                   </div>
                 </div>
               </article>
@@ -73,9 +75,7 @@ export default async function SaucesPage() {
               <div className="card">
                 <div className="card-body">
                   <p className="text-sm text-foreground/70">
-                    No active Stripe products found. Add products in Stripe
-                    (test mode) with metadata: bar_color (maroon|fire|rooster)
-                    and flavor_description.
+                    No active products found.
                   </p>
                 </div>
               </div>
