@@ -18,9 +18,22 @@ export default async function Page() {
   return (
     <div className="font-sans min-h-screen bg-background text-foreground">
       <main>
-        <section className="relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-maroon via-fire to-rooster" />
-          <div className="relative mx-auto max-w-6xl px-6 py-20 sm:py-28">
+        <section className="relative overflow-hidden min-h-[400px] flex items-center">
+          {/* Fire video as full background */}
+          <div className="absolute inset-0 z-0 pointer-events-none select-none">
+            <video
+              src="/fire.mp4"
+              autoPlay
+              loop
+              muted
+              playsInline
+              className="w-full h-full object-cover"
+              style={{ opacity: 0.7 }}
+            />
+            {/* Optional: overlay for readability */}
+            {/* <div className="absolute inset-0 bg-black/20" /> */}
+          </div>
+          <div className="relative mx-auto max-w-6xl px-6 py-20 sm:py-28 z-10">
             <div className="inline-flex items-center gap-2 rounded-full bg-pure/90 text-maroon px-3 py-1 text-xs font-semibold shadow">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-maroon" />
               2009 Rookie of the Year
@@ -34,14 +47,6 @@ export default async function Page() {
             </p>
             <div className="mt-8 flex flex-col sm:flex-row gap-3 sm:items-center">
               <a
-                href="https://store.houseofwings.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center rounded-full bg-pure text-maroon hover:bg-cream transition-colors px-6 py-3 text-sm sm:text-base font-semibold shadow"
-              >
-                Buy sauces online
-              </a>
-              <a
                 href="#sauces"
                 className="inline-flex items-center justify-center rounded-full border border-pure/70 text-pure hover:bg-pure hover:text-maroon transition-colors px-6 py-3 text-sm sm:text-base font-semibold"
               >
@@ -53,11 +58,10 @@ export default async function Page() {
 
         <section id="sauces" className="mx-auto max-w-6xl px-6 py-16">
           <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">
-            Our Sauces (Live from Stripe)
+            Our Sauces
           </h2>
           <p className="mt-2 text-foreground/70">
-            Pulled live from Stripe (test mode). Pricing & descriptions managed
-            in your Stripe dashboard.
+            Handcrafted, bold, and unforgettable. Discover your new favorite.
           </p>
 
           <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -66,7 +70,7 @@ export default async function Page() {
                 <div className={`h-1 ${p.barClass}`} />
                 {p.image && (
                   <div className="relative w-full aspect-[4/3] overflow-hidden">
-                    <img
+                    <Image
                       src={p.image}
                       alt={p.name}
                       fill
