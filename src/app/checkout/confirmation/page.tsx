@@ -38,6 +38,32 @@ export default function ConfirmationPage({ searchParams }: Props) {
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(!!pi);
 
+  const redirectStatus = (searchParams as any)?.redirect_status || "";
+  const failedRedirect = redirectStatus && redirectStatus !== "succeeded";
+
+  if (failedRedirect) {
+    return (
+      <main className="max-w-3xl mx-auto p-6">
+        <h1 className="text-2xl font-semibold mb-4">Payment was not completed</h1>
+        <p className="mb-4">
+          Your bank may have declined the charge or additional steps were required.
+          Please review your details and try again.
+        </p>
+        <div className="space-x-3">
+          <Link href={`/checkout?retry=1`} className="text-[#7a0d0d] underline">
+            Return to checkout
+          </Link>
+          {pi ? (
+            <Link href={`/checkout/confirmation?pi=${pi}`} className="text-[#7a0d0d] underline">
+              Refresh order status
+            </Link>
+          ) : null}
+        </div>
+      </main>
+    );
+  }
+
+
   React.useEffect(() => {
     if (!pi) return;
     setLoading(true);
