@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import AboutDropdown from "@/components/nav/AboutDropdown";
 import { usePathname } from "next/navigation";
 import { useTheme } from "../app/theme-provider";
 import { CartMini } from "@/components/cart";
@@ -19,7 +20,8 @@ import {
   HeartPulse,
   FileDown,
   NotebookPen,
-  Mail
+  Mail,
+  ChevronDown,
 } from "lucide-react";
 
 export default function Header() {
@@ -31,6 +33,7 @@ export default function Header() {
   const close = () => setOpen(false);
   const toggle = () => setOpen((o) => !o);
 
+  const [aboutOpen, setAboutOpen] = useState(false);
   useEffect(() => close(), [pathname]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
@@ -130,10 +133,8 @@ export default function Header() {
             <div className="hidden md:flex items-center gap-2">
               {navLink("/", "Home", Utensils)}
               {navLink("/sauces", "Sauces", Flame)}
-              {navLink("/recipes", "Recipes", NotebookPen)} {/* New Recipes link */}
-              {navLink("/benefits", "Benefits", HeartPulse)}
-              {navLink("/about", "About", Info)}
-              {navLink("/contact", "Contact", Mail)} {/* New Contact link */}
+              {navLink("/recipes", "Recipes", NotebookPen)}
+               <AboutDropdown />
               <CartMini />
             </div>
 
@@ -172,7 +173,6 @@ export default function Header() {
                   <Moon className="h-4 w-4" />
                 ))}
             </button>
-            {/* Optional external shop button(s) can remain here */}
           </nav>
         </div>
       </header>
@@ -234,20 +234,73 @@ export default function Header() {
           >
             <NotebookPen className="h-4 w-4" /> Recipes
           </Link>
-          <Link
-            onClick={close}
-            href="/benefits"
-            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5"
+          <button
+            onClick={() => setAboutOpen((v) => !v)}
+            className="inline-flex items-center justify-between rounded-lg px-3 py-2 hover:bg-foreground/5"
+            aria-expanded={aboutOpen}
+            aria-controls="about-submenu"
           >
-            + <HeartPulse className="h-4 w-4" /> Benefits +{" "}
-          </Link>
-          <Link
-            onClick={() => setOpen(false)}
-            href="/about"
-            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5"
+            <span className="inline-flex items-center gap-2">
+              <Info className="h-4 w-4" /> About
+            </span>
+            <ChevronDown
+              className={`h-4 w-4 transition-transform ${
+                aboutOpen ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+          <div
+            id="about-submenu"
+            className={`overflow-hidden transition-[max-height] duration-200 ${
+              aboutOpen ? "max-h-96" : "max-h-0"
+            }`}
           >
-            <Info className="h-4 w-4" /> About
-          </Link>
+            <div className="ml-6 mt-1 flex flex-col">
+              <Link
+                onClick={() => setOpen(false)}
+                href="/about"
+                className="rounded-lg px-3 py-2 text-sm hover:bg-foreground/5"
+              >
+                About Overview
+              </Link>
+              <Link
+                onClick={() => setOpen(false)}
+                href="/about/our-story"
+                className="rounded-lg px-3 py-2 text-sm hover:bg-foreground/5"
+              >
+                Our Story
+              </Link>
+              <Link
+                onClick={() => setOpen(false)}
+                href="/about/benefits-of-cayenne"
+                className="rounded-lg px-3 py-2 text-sm hover:bg-foreground/5"
+              >
+                Benefits of Cayenne
+              </Link>
+              <Link
+                onClick={() => setOpen(false)}
+                href="/about/hours-location#hours"
+                className="rounded-lg px-3 py-2 text-sm hover:bg-foreground/5"
+              >
+                Hours
+              </Link>
+              <Link
+                onClick={() => setOpen(false)}
+                href="/about/hours-location#map"
+                className="rounded-lg px-3 py-2 text-sm hover:bg-foreground/5"
+              >
+                Location &amp; Map
+              </Link>
+              <Link
+                onClick={() => setOpen(false)}
+                href="/about/contact"
+                className="rounded-lg px-3 py-2 text-sm hover:bg-foreground/5"
+              >
+                Contact Us
+              </Link>
+            </div>
+          </div>
+
           <Link
             onClick={() => setOpen(false)}
             href="/contact"
