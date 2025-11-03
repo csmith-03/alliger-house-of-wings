@@ -87,15 +87,11 @@ export async function POST(req: Request) {
         tax: String(tax),
         rate_id: rateId || "",
         cart: JSON.stringify(
-          (safeItems as Array<Record<string, any>>).map((it) => ({
-            id: it.productId ?? it.id, // id for display
-            productId: it.productId ?? it.id, // canonical id
-            name: it.name ?? "",
+          safeItems.map((it) => ({
+            productId: String(it.productId ?? it.id),
             quantity: Number(it.qty ?? it.quantity ?? 1),
-            unitAmount: Number(it.price ?? it.unitAmount ?? 0),
-            image: it.image ?? null, // include image
-          })),
-        ).slice(0, 4900),
+          }))
+        ),
       },
     });
 
