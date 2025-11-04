@@ -87,7 +87,13 @@ export default function CheckoutPage() {
         const res = await fetch("/api/shipping", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: addr, items: norm }),
+        body: JSON.stringify({
+          address: addr,
+          items: norm.map((it) => ({
+            quantity: Number(it.quantity ?? it.qty ?? 1),
+            weightOz: Number(it.weightOz ?? 0),
+          })),
+        }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error || "Failed to fetch rates.");
@@ -126,7 +132,10 @@ export default function CheckoutPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            items: norm,
+            items: norm.map((it) => ({
+              id: String(it.id ?? it.productId),
+              quantity: Number(it.quantity ?? it.qty ?? 1),
+            })),
             currency: safeCurrency,
             shipCents,
             address: addr,
@@ -318,6 +327,8 @@ function CheckoutFlowUI(props: {
   const router = useRouter();
   const { theme } = useTheme?.() || { theme: "dark" };
   const themeClass = getThemeClasses(theme);
+  const [payBusy, setPayBusy] = useState(false);
+  const [payErr, setPayErr] = useState<string | null>(null);
 
   // can't confirm address until it's complete and we're not fetching rates
   const canConfirmAddress = props.addrComplete && !props.busyRates;
@@ -325,6 +336,8 @@ function CheckoutFlowUI(props: {
   // Submit payment handler to Stripe, redirect to confirmation page
   async function handlePay() {
     if (!stripe || !elements) return;
+    setPayBusy(true);
+    setPayErr(null);
 
     const { error } = await stripe.confirmPayment({
       elements,
@@ -332,11 +345,11 @@ function CheckoutFlowUI(props: {
         return_url: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/checkout/confirmation`,
       },
     });
-    // Stripe didn't redirect (an error occurred)
+    // Stripe didn't redirect, immediate error occurred (validation/card/etc.)
     if (error) {
-      console.error(error);
-      alert(error.message || "Payment failed. Please try again.");
+      setPayErr(error.message || "Payment failed. Please check your details and try again.");
     }
+    setPayBusy(false);
   }
 
   return (
@@ -471,17 +484,25 @@ function CheckoutFlowUI(props: {
       {/* Payment */}
       {props.hasClientSecret ? (
         <>
-          <section className={`rounded-md border p-4 ${themeClass.surface}`}>
-            <h3 className="text-lg font-semibold mb-2">Payment</h3>
-            <PaymentElement />
-          </section>
-          <button
-            type="button"
-            onClick={handlePay}
-            className="w-full rounded-md py-2.5 font-medium text-white bg-[#7a0d0d] hover:brightness-110"
-          >
-            Pay
-          </button>
+         {payErr && (
+           <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-2">
+           {payErr}
+           </div>
+         )}
+
+         <section className={`rounded-md border p-4 ${themeClass.surface}`}>
+           <h3 className="text-lg font-semibold mb-2">Payment</h3>
+           <PaymentElement />
+         </section>
+
+         <button
+           type="button"
+           onClick={handlePay}
+           disabled={payBusy}
+           className={`w-full rounded-md py-2.5 font-medium text-white bg-[#7a0d0d] hover:brightness-110 ${payBusy ? "opacity-60 cursor-not-allowed" : ""}`}
+         >
+           {payBusy ? "Processing…" : "Pay"}
+         </button>
         </>
       ) : (
         <>

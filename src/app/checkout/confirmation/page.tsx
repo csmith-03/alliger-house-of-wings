@@ -27,16 +27,44 @@ import { getOrder } from "./getOrder";
 import { useEffect, useState } from "react";
 import React from "react";
 import { Loader2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 
 type Props = { searchParams: { pi?: string; payment_intent?: string } };
 
-export default function ConfirmationPage({ searchParams }: Props) {
+export default function ConfirmationPage() {
   const { theme } = useTheme?.() ?? { theme: "dark" };
   const themeClass = getThemeClasses(theme);
 
-  const pi = searchParams.pi || searchParams.payment_intent || "";
+  const sp = useSearchParams();
+  const pi = sp.get("pi") ?? sp.get("payment_intent") ?? "";
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(!!pi);
+
+  const redirectStatus = sp.get("redirect_status") ?? "";
+  const failedRedirect = redirectStatus && redirectStatus !== "succeeded";
+
+  if (failedRedirect) {
+    return (
+      <main className="max-w-3xl mx-auto p-6">
+        <h1 className="text-2xl font-semibold mb-4">Payment was not completed</h1>
+        <p className="mb-4">
+          Your bank may have declined the charge or additional steps were required.
+          Please review your details and try again.
+        </p>
+        <div className="space-x-3">
+          <Link href={`/checkout?retry=1`} className="text-[#7a0d0d] underline">
+            Return to checkout
+          </Link>
+          {pi ? (
+            <Link href={`/checkout/confirmation?pi=${pi}`} className="text-[#7a0d0d] underline">
+              Refresh order status
+            </Link>
+          ) : null}
+        </div>
+      </main>
+    );
+  }
+
 
   React.useEffect(() => {
     if (!pi) return;
@@ -93,6 +121,28 @@ export default function ConfirmationPage({ searchParams }: Props) {
     tax,
     cart,
   } = order;
+
+  const cartItems: Array<{
+    id: string;
+    name: string;
+    quantity: number;
+    unitAmount: number;
+    image?: string | null;
+  }> = cart ?? [];
+
+  const computedSubtotal = cartItems.reduce((sum, it) => {
+    const unit = Math.max(0, Math.round(Number(it.unitAmount) || 0));
+    const qty = Math.max(1, Math.round(Number(it.quantity) || 1));
+    return sum + unit * qty;
+  }, 0);
+
+  const displaySubtotal = subtotal && subtotal > 0 ? subtotal : computedSubtotal;
+  const displayTax =
+    tax && tax >= 0
+      ? tax
+      : Math.max(0, (amount ?? 0) - (shipping_cents ?? 0) - displaySubtotal);
+  const displayTotal =
+    amount ?? (displaySubtotal + (shipping_cents ?? 0) + (displayTax ?? 0));
 
   const money = (cents: number) =>
     (Math.max(0, Math.round(cents)) / 100).toFixed(2);
@@ -196,7 +246,7 @@ export default function ConfirmationPage({ searchParams }: Props) {
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <dt>Subtotal</dt>
-                <dd>${money(subtotal ?? 0)}</dd>
+                <dd>${money(displaySubtotal)}</dd>
               </div>
               <div className="flex justify-between">
                 <dt>Shipping</dt>
@@ -204,14 +254,12 @@ export default function ConfirmationPage({ searchParams }: Props) {
               </div>
               <div className="flex justify-between">
                 <dt>Tax</dt>
-                <dd>${money(tax ?? 0)}</dd>
+                <dd>${money(displayTax)}</dd>
               </div>
               <div className="my-3 border-t" />
               <div className="flex justify-between text-base font-semibold">
                 <dt>Total</dt>
-                <dd>
-                  ${money(amount ?? 0)} {currency?.toUpperCase()}
-                </dd>
+                <dd>${money(displayTotal)} {currency?.toUpperCase()}</dd>
               </div>
             </dl>
           </div>
