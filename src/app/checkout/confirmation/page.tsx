@@ -27,18 +27,20 @@ import { getOrder } from "./getOrder";
 import { useEffect, useState } from "react";
 import React from "react";
 import { Loader2 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 
 type Props = { searchParams: { pi?: string; payment_intent?: string } };
 
-export default function ConfirmationPage({ searchParams }: Props) {
+export default function ConfirmationPage() {
   const { theme } = useTheme?.() ?? { theme: "dark" };
   const themeClass = getThemeClasses(theme);
 
-  const pi = searchParams.pi || searchParams.payment_intent || "";
+  const sp = useSearchParams();
+  const pi = sp.get("pi") ?? sp.get("payment_intent") ?? "";
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState<boolean>(!!pi);
 
-  const redirectStatus = (searchParams as any)?.redirect_status || "";
+  const redirectStatus = sp.get("redirect_status") ?? "";
   const failedRedirect = redirectStatus && redirectStatus !== "succeeded";
 
   if (failedRedirect) {
@@ -119,6 +121,28 @@ export default function ConfirmationPage({ searchParams }: Props) {
     tax,
     cart,
   } = order;
+
+  const cartItems: Array<{
+    id: string;
+    name: string;
+    quantity: number;
+    unitAmount: number;
+    image?: string | null;
+  }> = cart ?? [];
+
+  const computedSubtotal = cartItems.reduce((sum, it) => {
+    const unit = Math.max(0, Math.round(Number(it.unitAmount) || 0));
+    const qty = Math.max(1, Math.round(Number(it.quantity) || 1));
+    return sum + unit * qty;
+  }, 0);
+
+  const displaySubtotal = subtotal && subtotal > 0 ? subtotal : computedSubtotal;
+  const displayTax =
+    tax && tax >= 0
+      ? tax
+      : Math.max(0, (amount ?? 0) - (shipping_cents ?? 0) - displaySubtotal);
+  const displayTotal =
+    amount ?? (displaySubtotal + (shipping_cents ?? 0) + (displayTax ?? 0));
 
   const money = (cents: number) =>
     (Math.max(0, Math.round(cents)) / 100).toFixed(2);
@@ -222,7 +246,7 @@ export default function ConfirmationPage({ searchParams }: Props) {
             <dl className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <dt>Subtotal</dt>
-                <dd>${money(subtotal ?? 0)}</dd>
+                <dd>${money(displaySubtotal)}</dd>
               </div>
               <div className="flex justify-between">
                 <dt>Shipping</dt>
@@ -230,14 +254,12 @@ export default function ConfirmationPage({ searchParams }: Props) {
               </div>
               <div className="flex justify-between">
                 <dt>Tax</dt>
-                <dd>${money(tax ?? 0)}</dd>
+                <dd>${money(displayTax)}</dd>
               </div>
               <div className="my-3 border-t" />
               <div className="flex justify-between text-base font-semibold">
                 <dt>Total</dt>
-                <dd>
-                  ${money(amount ?? 0)} {currency?.toUpperCase()}
-                </dd>
+                <dd>${money(displayTotal)} {currency?.toUpperCase()}</dd>
               </div>
             </dl>
           </div>

@@ -68,13 +68,38 @@ export async function GET(_: Request, { params }: { params: { pi: string } }) {
 
       // normalize each item into a predictable shape
       if (Array.isArray(arr)) {
-        cartParsed = arr.map((x: any) => ({
-          id: String(x.productId ?? x.id ?? ""),
-          name: String(x.name ?? ""),
-          quantity: Number(x.quantity ?? x.qty ?? 1),
-          unitAmount: Number(x.unitAmount ?? x.price ?? 0),
-          image: x.image ?? null,
-        }));
+        // step 1: normalize minimal items
+        const metaItems = arr
+          .map((x: any) => ({
+            productId: String(x.productId ?? x.id ?? ""),
+            quantity: Number(x.quantity ?? x.qty ?? 1),
+          }))
+          .filter((x) => x.productId);
+
+        // step 2: reload from Stripe
+        cartParsed = await Promise.all(
+          metaItems.map(async ({ productId, quantity }) => {
+            const product = await stripe.products.retrieve(productId);
+
+            let unitAmount = 0;
+            if (product.default_price) {
+              const price =
+                typeof product.default_price === "string"
+                  ? await stripe.prices.retrieve(product.default_price)
+                  : product.default_price;
+              unitAmount = price?.unit_amount ?? 0;
+            }
+
+            return {
+              id: product.id,
+              name: product.name,
+              quantity: Number.isFinite(quantity) ? Math.max(1, Math.round(quantity)) : 1,
+              unitAmount,
+              image:
+                (Array.isArray(product.images) && product.images[0]) || null,
+            };
+          })
+        );
       }
     } catch {
       // return empty cart if parsing fails

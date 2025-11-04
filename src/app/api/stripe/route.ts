@@ -19,19 +19,9 @@
  *   }
  *
  * Behavior:
- *   - Sanitizes cart items and computes subtotal.
- *   - Validates/rounds shipping cost and calculates tax estimate.
- *   - Ensures total amount is an integer >= 50 cents (Stripe requirement).
- *   - Creates a PaymentIntent with automatic payment methods.
- *   - Embeds metadata (subtotal, shipping, tax, rate_id, cart JSON).
- *
- * Output (200 OK):
- *   {
- *     clientSecret: string   // Stripe client_secret for the PaymentIntent
- *   }
- *
- * Errors:
- *   - 500 with { error } if Stripe or calculation fails.
+ *   - Fetches unit prices from Stripe if not provided.
+ *   - Computes subtotal, shipping, and tax.
+ *   - Creates a PaymentIntent with correct totals and minimal metadata.
  */
 
 import { NextResponse } from "next/server";
@@ -50,20 +40,49 @@ export async function POST(req: Request) {
     } = await req.json();
 
     const safeItems = sanitize(items as CartLine[]);
+
+    // normalize missing prices from Stripe
+    const enriched = await Promise.all(
+      safeItems.map(async (it) => {
+        const productId = String(it.productId ?? it.id);
+        let unitAmount = Number(it.unitAmount ?? 0);
+
+        // if unitAmount not provided, look up from Stripe
+        if (!unitAmount || unitAmount <= 0) {
+          const product = await stripe.products.retrieve(productId);
+          if (product.default_price) {
+            const price =
+              typeof product.default_price === "string"
+                ? await stripe.prices.retrieve(product.default_price)
+                : product.default_price;
+            unitAmount = price?.unit_amount ?? 0;
+          }
+        }
+
+        return {
+          ...it,
+          id: productId,
+          productId,
+          unitAmount,
+          quantity: Number(it.qty ?? it.quantity ?? 1),
+        };
+      })
+    );
+
     const ship = Number.isFinite(shipCents)
       ? Math.max(0, Math.round(shipCents))
       : 0;
 
-    const base = breakdown(safeItems, 0); // subtotal only here
+    const base = breakdown(enriched, 0);
     const tax = estimateTax({
       subTotal: base.subtotal,
       shippingCents: ship,
       toAddress: address,
     });
     const total = base.subtotal + ship + tax;
-
     const amount = Math.max(50, Math.round(total));
 
+    // create PaymentIntent with minimal metadata
     const pi = await stripe.paymentIntents.create({
       amount,
       currency,
@@ -87,24 +106,20 @@ export async function POST(req: Request) {
         tax: String(tax),
         rate_id: rateId || "",
         cart: JSON.stringify(
-          (safeItems as Array<Record<string, any>>).map((it) => ({
-            id: it.productId ?? it.id, // id for display
-            productId: it.productId ?? it.id, // canonical id
-            name: it.name ?? "",
-            quantity: Number(it.qty ?? it.quantity ?? 1),
-            unitAmount: Number(it.price ?? it.unitAmount ?? 0),
-            image: it.image ?? null, // include image
-          })),
-        ).slice(0, 4900),
+          enriched.map((it) => ({
+            productId: String(it.productId ?? it.id),
+            quantity: Number(it.quantity ?? 1),
+          }))
+        ),
       },
     });
 
     return NextResponse.json({ clientSecret: pi.client_secret });
   } catch (err: any) {
-    console.error(err);
+    console.error("Stripe route error:", err);
     return NextResponse.json(
       { error: err?.message ?? "failed" },
-      { status: 500 },
+      { status: 500 }
     );
   }
 }

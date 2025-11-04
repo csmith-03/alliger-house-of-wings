@@ -87,7 +87,13 @@ export default function CheckoutPage() {
         const res = await fetch("/api/shipping", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ address: addr, items: norm }),
+        body: JSON.stringify({
+          address: addr,
+          items: norm.map((it) => ({
+            quantity: Number(it.quantity ?? it.qty ?? 1),
+            weightOz: Number(it.weightOz ?? 0),
+          })),
+        }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error || "Failed to fetch rates.");
@@ -126,7 +132,10 @@ export default function CheckoutPage() {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            items: norm,
+            items: norm.map((it) => ({
+              id: String(it.id ?? it.productId),
+              quantity: Number(it.quantity ?? it.qty ?? 1),
+            })),
             currency: safeCurrency,
             shipCents,
             address: addr,
