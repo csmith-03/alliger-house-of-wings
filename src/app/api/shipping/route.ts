@@ -114,6 +114,7 @@ export async function POST(req: Request) {
         address_to: toAddress,
         parcels: [parcel],
         async: false,
+        carrier_accounts: process.env.SHIPPO_UPS_ACCOUNT_ID ? [process.env.SHIPPO_UPS_ACCOUNT_ID] : undefined,
       }),
     });
 
@@ -128,23 +129,17 @@ export async function POST(req: Request) {
     const shipment = await resp.json();
     const rawRates: any[] = shipment?.rates ?? [];
 
-    // only return USPS shipping options
-    const wanted = new Set([
-      "usps_ground_advantage",
-      "usps_priority",
-      "usps_priority_express",
-    ]);
-
-    // filter/normalize rates into format that's compatible with the UI
+    // UPS ONLY — filter/normalize into UI format
     const rates = rawRates
-      .filter((r) => r.currency === "USD" && r.provider === "USPS")
-      .filter((r) => wanted.has(r?.servicelevel?.token))
+      .filter((r) => r.currency === "USD" && String(r.provider).toUpperCase() === "UPS")
       .map((r) => {
         const est = Number(r.estimated_days) || undefined;
         return {
           id: String(r.object_id),
-          label: r?.servicelevel?.name || r?.servicelevel?.token || "USPS",
-          amount: Math.round(Number(r.amount) * 100), // cents
+          label: r?.servicelevel?.name
+            ? `UPS ${r.servicelevel.name}`
+            : (r?.servicelevel?.token ? `UPS ${r.servicelevel.token}` : "UPS"),
+          amount: Math.round(Number(r.amount) * 100),
           daysMin: est ?? 2,
           daysMax: est ? est + 1 : 5,
         };
