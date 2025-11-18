@@ -34,7 +34,7 @@ export default function OrderSummary({
   if (shippingPhase === "beforeAddress") {
     shippingLabel = "Calculated from address";
   } else if (shippingPhase === "selectRate") {
-    shippingLabel = "Select USPS option";
+    shippingLabel = "Select UPS option";
   } else {
     shippingLabel = ship == null ? "TBD" : `$${money(ship)}`;
   }

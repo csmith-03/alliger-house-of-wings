@@ -25,7 +25,6 @@
  *   - Computes total package weight in ounces from items.
  *   - Builds a parcel with fixed dimensions.
  *   - Calls Shippo API to create a shipment and get rates.
- *   - Filters for USPS services (ground, priority, express).
  *   - Returns rates in cents, sorted by price, with estimated days.
  *
  * Output (200 OK):
@@ -129,9 +128,20 @@ export async function POST(req: Request) {
     const shipment = await resp.json();
     const rawRates: any[] = shipment?.rates ?? [];
 
-    // UPS ONLY — filter/normalize into UI format
+    // only retrieve specified UPS services
+    const allowedTokens = new Set<string>([
+      "ups_ground",
+      "ups_3_day_select",
+      "ups_second_day_air",
+    ]);
+
     const rates = rawRates
-      .filter((r) => r.currency === "USD" && String(r.provider).toUpperCase() === "UPS")
+      .filter(
+        (r) =>
+          r.currency === "USD" &&
+          String(r.provider).toUpperCase() === "UPS" &&
+          (!r?.servicelevel?.token || allowedTokens.has(r.servicelevel.token))
+      )
       .map((r) => {
         const est = Number(r.estimated_days) || undefined;
         return {
