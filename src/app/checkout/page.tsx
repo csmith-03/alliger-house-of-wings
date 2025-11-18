@@ -3,7 +3,7 @@
  *
  * Flow (three phases):
  *   1) Address: user enters and confirms shipping address (Stripe AddressElement).
- *   2) Shipping: we POST /api/shipping with { address, items } to fetch UPS rates; user picks one.
+ *   2) Shipping: we POST /api/shipping with { address, items } to fetch USPS rates; user picks one.
  *   3) Payment: we POST /api/stripe with { items, currency, shipCents, address, rateId } to create a PaymentIntent,
  *      then render <PaymentElement> and confirm the payment (redirect).
  *
@@ -108,7 +108,7 @@ export default function CheckoutPage() {
         setBusyRates(true);
         setUiErr(null);
 
-        // get UPS rates based on current address + cart from API
+        // get USPS rates based on current address + cart from API
         const res = await fetch("/api/shipping", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -248,7 +248,7 @@ export default function CheckoutPage() {
         <h1 className="text-3xl font-bold mb-6">Checkout</h1>
 
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* LEFT: Address / UPS / Payment */}
+          {/* LEFT: Address / USPS / Payment */}
           <section className="lg:col-span-2 space-y-4">
             <Elements
               stripe={stripePromise}
@@ -462,13 +462,13 @@ function CheckoutFlowUI(props: {
         )}
       </section>
 
-      {/* UPS shipping options */}
+      {/* USPS shipping options */}
       <section className={`rounded-md border p-4 ${themeClass.surface}`}>
-        <h2 className="text-lg font-semibold mb-2">UPS Shipping</h2>
+        <h2 className="text-lg font-semibold mb-2">USPS Shipping</h2>
 
         {!props.addrConfirmed ? (
           <p className="text-sm text-foreground/60">
-            Confirm your address to see UPS options.
+            Confirm your address to see USPS options.
           </p>
         ) : props.busyRates ? (
           <div className="flex justify-center items-center py-8">
