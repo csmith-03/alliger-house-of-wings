@@ -129,7 +129,9 @@ export async function POST(req: Request) {
     const shipment = await resp.json();
     const rawRates: any[] = shipment?.rates ?? [];
 
-    // UPS ONLY — filter/normalize into UI format
+    // only retrieve UPS Ground
+    const allowedTokens = new Set<string>(["ups_ground"]);
+
     const rates = rawRates
       .filter((r) => r.currency === "USD" && String(r.provider).toUpperCase() === "UPS")
       .map((r) => {
