@@ -14,7 +14,7 @@ export default function BenefitsPage() {
 
       <figure className="mt-8 rounded-xl overflow-hidden border border-foreground/10 bg-foreground/[0.03]">
         <div className="relative w-full aspect-[16/7] sm:aspect-[16/6]">
-          <img
+          <Image
             src="/images/pepper.jpg"
             alt="Fresh super cayenne peppers used in our hotter wing sauces"
             fill
