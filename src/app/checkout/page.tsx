@@ -462,49 +462,86 @@ function CheckoutFlowUI(props: {
         )}
       </section>
 
-      {/* Payment */}
-      {props.hasClientSecret ? (
-        <>
-         {payErr && (
-           <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-2">
-           {payErr}
-           </div>
-         )}
+      {/* USPS shipping options */}
+      <section className={`rounded-md border p-4 ${themeClass.surface}`}>
+        <h2 className="text-lg font-semibold mb-2">USPS Shipping</h2>
 
-         <section className={`rounded-md border p-4 ${themeClass.surface}`}>
-           <h3 className="text-lg font-semibold mb-2">Payment</h3>
-           <PaymentElement />
-         </section>
-
-        <button
-          type="button"
-          onClick={handlePay}
-          disabled={payBusy}
-          className={`w-full rounded-md py-2.5 font-medium text-white bg-[#7a0d0d] hover:brightness-110 ${
-            payBusy ? "opacity-60 cursor-not-allowed" : ""
-          }`}
-        >
-          {payBusy ? "Processing…" : "Pay"}
-          </button>
-        </>
-      ) : props.addrConfirmed ? (
-        // show loading section after address is confirmed while we're calculating shipping + creating PaymentIntent
-        <section
-          className={`rounded-md border p-6 text-center ${themeClass.surface}`}
-        >
-          <h2 className="text-lg font-semibold mb-4">
-            Calculating shipping and preparing secure payment…
-          </h2>
-
-          <div className="flex justify-center items-center py-6">
+        {!props.addrConfirmed ? (
+          <p className="text-sm text-foreground/60">
+            Confirm your address to see USPS options.
+          </p>
+        ) : props.busyRates ? (
+          <div className="flex justify-center items-center py-8">
             <Loader2
-              className={`animate-spin h-10 w-10 ${
+              className={`animate-spin h-8 w-8 ${
                 theme === "dark" ? "text-gray-300" : "text-gray-600"
               }`}
             />
           </div>
-        </section>
+        ) : props.shipOpts.length === 0 ? (
+          <p className="text-sm text-red-600">
+            No rates available. Try editing your address.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {props.shipOpts.map((opt) => (
+              <label
+                key={opt.id}
+                className={`flex items-center justify-between rounded-md border p-3 text-sm hover:bg-[color:var(--surface-muted)] ${themeClass.surface} ${themeClass.border}`}
+              >
+                <div className="flex items-center gap-3">
+                  <input
+                    type="radio"
+                    name="ship"
+                    checked={props.chosen?.id === opt.id}
+                    onChange={() => props.setChosen(opt)}
+                    style={{
+                      accentColor: theme === "dark" ? "#dfa32e" : "#7a0d0d",
+                    }}
+                  />
+                  <div>
+                    <div className="font-medium">{opt.label}</div>
+                    <div className={themeClass.textMuted}>
+                      {opt.daysMin}–{opt.daysMax} days
+                    </div>
+                  </div>
+                </div>
+                <div className="font-medium">${money(opt.amount)}</div>
+              </label>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Payment */}
+      {props.uiErr && (
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {props.uiErr}
+        </div>
+      )}
+
+      {canShowPayment ? (
+        <>
+          {payErr && (
+            <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-2">
+              {payErr}
+            </div>
+          )}
+          <section className={`rounded-md border p-4 ${themeClass.surface}`}>
+            <h3 className="text-lg font-semibold mb-2">Payment</h3>
+            <PaymentElement />
+          </section>
+          <button
+            type="button"
+            onClick={handlePay}
+            disabled={payBusy}
+            className={`w-full rounded-md py-2.5 font-medium text-white bg-[#7a0d0d] hover:brightness-110 ${payBusy ? "opacity-60 cursor-not-allowed" : ""}`}
+          >
+            {payBusy ? "Processing…" : "Pay"}
+          </button>
+        </>
       ) : null}
+      
     </form>
   );
 }
