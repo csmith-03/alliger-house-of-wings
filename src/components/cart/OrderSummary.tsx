@@ -12,6 +12,8 @@ type Props = {
   cartDisabled?: boolean;
   title?: string;
   theme?: "light" | "dark";
+  shippingServiceLabel?: string;
+  shippingEtaLabel?: string;
 };
 
 export default function OrderSummary({
@@ -22,6 +24,8 @@ export default function OrderSummary({
   cartDisabled,
   title = "Order Summary",
   theme = "light",
+  shippingServiceLabel,
+  shippingEtaLabel,
 }: Props) {
   const ship =
     typeof chosenShippingCents === "number"
@@ -30,14 +34,18 @@ export default function OrderSummary({
 
   const totalEst = (subtotal ?? 0) + (tax ?? 0) + (ship ?? 0);
 
-  let shippingLabel: string;
+  let shippingAmountLabel: string;
   if (shippingPhase === "beforeAddress") {
-    shippingLabel = "Calculated from address";
+    shippingAmountLabel = "Calculated from address";
   } else if (shippingPhase === "selectRate") {
-    shippingLabel = "Select USPS option";
+    shippingAmountLabel = "Calculating…";
   } else {
-    shippingLabel = ship == null ? "TBD" : `$${money(ship)}`;
+    shippingAmountLabel = ship == null ? "TBD" : `$${money(ship)}`;
   }
+
+  const serviceText = shippingServiceLabel || "UPS Ground";
+  const etaText = shippingEtaLabel;
+
 
   // Theme-based classes
   const asideCls =
@@ -61,11 +69,14 @@ export default function OrderSummary({
 
         <div className="flex items-center justify-between">
           <dt className="text-foreground/80">Shipping</dt>
-          <dd className="text-foreground">{shippingLabel}</dd>
+          <dd className="text-foreground">{shippingAmountLabel}</dd>
+        </div>
+        <div className="mt-1 text-xs text-foreground/60">
+          {etaText ? `${serviceText} · ${etaText}` : serviceText}
         </div>
 
         <div className="flex items-center justify-between">
-          <dt className="text-foreground/80">Estimated tax</dt>
+          <dt className="text-foreground/80">Tax</dt>
           <dd className="text-foreground">${money(tax)}</dd>
         </div>
 

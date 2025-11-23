@@ -13,35 +13,27 @@
  *       country?: string
  *     },
  *     items: Array<{
+ *       name?: string,
  *       quantity?: number,
- *       qty?: number,
- *       weightOz?: number
+ *       qty?: number
  *     }>
  *   }
  *
  * Behavior:
  *   - Normalizes destination address (accepts multiple field names).
  *   - Only supports US addresses; requires ZIP code.
- *   - Computes total package weight in ounces from items.
- *   - Builds a parcel with fixed dimensions.
- *   - Calls Shippo API to create a shipment and get rates.
- *   - Filters for USPS services (ground, priority, express).
+ *   - Determines number of bottles vs gallons based on product names:
+ *       - name containing "gallon" => gallon
+ *       - everything else => bottles
+ *   - Uses lookup table for:
+ *       - weight per bottle count (1–12) + box dimensions
+ *       - weight per gallon count (1–4) + box dimensions
+ *   - Builds parcels:
+ *       - gallons grouped up to 4 per box
+ *       - bottles grouped up to 12 per box
+ *   - Converts pounds → ounces for Shippo.
+ *   - Calls Shippo API to create a shipment and get UPS Ground rate(s) (or any UPS rate as a fallback).
  *   - Returns rates in cents, sorted by price, with estimated days.
- *
- * Output (200 OK):
- *   {
- *     rates: Array<{
- *       id: string,       // Shippo object_id
- *       label: string,    // service name
- *       amount: number,   // price in cents
- *       daysMin: number,  // estimated minimum days
- *       daysMax: number   // estimated maximum days
- *     }>
- *   }
- *
- * Errors:
- *   - Returns { rates: [] } if invalid input, non-US, or Shippo error.
- *   - Logs errors server-side for debugging.
  */
 
 import { NextResponse } from "next/server";
@@ -58,6 +50,127 @@ const ORIGIN = {
   phone: process.env.SHIP_FROM_PHONE || undefined,
   email: process.env.SHIP_FROM_EMAIL || undefined,
 };
+
+type BoxDims = { length: number; width: number; height: number };
+
+type BottleRule = {
+  weightLbs: number;
+  box: BoxDims;
+};
+
+type GallonRule = {
+  weightLbs: number;
+  box: BoxDims;
+};
+
+/**
+ *  - Each key = # of bottles / gallons in the shipment.
+ *  - weightLbs = total package weight in pounds.
+ *  - box = the dimensions to use for that count.
+ */
+
+// bottle rules
+const bottleConfig: Record<number, BottleRule> = {
+  1: { weightLbs: 3, box: { length: 7, width: 7, height: 14 } },
+  2: { weightLbs: 5, box: { length: 7, width: 7, height: 14 } },
+  3: { weightLbs: 6, box: { length: 7, width: 7, height: 14 } },
+  4: { weightLbs: 8, box: { length: 7, width: 7, height: 14 } },
+  5: { weightLbs: 10, box: { length: 7, width: 7, height: 14 } },
+  6: { weightLbs: 11, box: { length: 13, width: 13, height: 13 } },
+  7: { weightLbs: 12, box: { length: 13, width: 13, height: 13 } },
+  8: { weightLbs: 13, box: { length: 13, width: 13, height: 13 } },
+  9: { weightLbs: 14, box: { length: 13, width: 13, height: 13 } },
+  10: { weightLbs: 15, box: { length: 13, width: 13, height: 13 } },
+  11: { weightLbs: 17, box: { length: 13, width: 13, height: 13 } },
+  12: { weightLbs: 19, box: { length: 13, width: 13, height: 13 } },
+};
+
+// gallon rules
+const gallonConfig: Record<number, GallonRule> = {
+  1: { weightLbs: 11, box: { length: 7, width: 7, height: 14 } },
+  2: { weightLbs: 22, box: { length: 13.5, width: 7.875, height: 13.5625 } },
+  3: { weightLbs: 33, box: { length: 13, width: 13, height: 13 } },
+  4: { weightLbs: 38, box: { length: 13, width: 13, height: 13 } },
+};
+
+/**
+ * count bottles & gallons based on product names.
+ * - "gallon" in name → that many gallons
+ * - "12" in name     → that many 12oz bottles
+ */
+function parseUnits(items: any[]) {
+  let bottles = 0;
+  let gallons = 0;
+
+  for (const item of items) {
+    const name = String(item?.name ?? "").toLowerCase();
+    const qtyRaw = item?.quantity ?? item?.qty ?? 1;
+    const qty = Number.isFinite(Number(qtyRaw))
+      ? Math.max(1, Number(qtyRaw))
+      : 1;
+
+    if (name.includes("gallon")) {
+      gallons += qty;
+    } else {
+      // default everything else to bottles so there's always weight/dims
+      bottles += qty;
+    }
+  }
+
+  return { bottles, gallons };
+}
+
+function buildParcelsFromCounts(bottles: number, gallons: number) {
+  const parcels: any[] = [];
+
+  // handle gallons first
+  let gLeft = Math.max(0, Math.round(gallons));
+  const gMax = Math.max(...Object.keys(gallonConfig).map(Number));
+  while (gLeft > 0) {
+    const chunk = Math.min(gLeft, gMax);
+    const rule = gallonConfig[chunk] ?? gallonConfig[gMax];
+    parcels.push({
+      length: rule.box.length,
+      width: rule.box.width,
+      height: rule.box.height,
+      distance_unit: "in",
+      weight: Math.max(1, Math.round(rule.weightLbs * 16)), // oz
+      mass_unit: "oz",
+    });
+    gLeft -= chunk;
+  }
+
+  // handle bottles next
+  let bLeft = Math.max(0, Math.round(bottles));
+  const bMax = Math.max(...Object.keys(bottleConfig).map(Number));
+  while (bLeft > 0) {
+    const chunk = Math.min(bLeft, bMax);
+    const rule = bottleConfig[chunk] ?? bottleConfig[bMax];
+    parcels.push({
+      length: rule.box.length,
+      width: rule.box.width,
+      height: rule.box.height,
+      distance_unit: "in",
+      weight: Math.max(1, Math.round(rule.weightLbs * 16)), // oz
+      mass_unit: "oz",
+    });
+    bLeft -= chunk;
+  }
+
+  // fallback if necessary
+  if (!parcels.length) {
+    parcels.push({
+      length: 7,
+      width: 7,
+      height: 14,
+      distance_unit: "in",
+      weight: 16, // 1 lb
+      mass_unit: "oz",
+    });
+  }
+
+  return parcels;
+}
 
 export async function POST(req: Request) {
   try {
@@ -80,27 +193,31 @@ export async function POST(req: Request) {
     };
 
     // only for US now
-    if (toAddress.country !== "US" || !toAddress.zip) {
-      return NextResponse.json({ rates: [] }, { status: 200 });
+    if (toAddress.country !== "US") {
+      return NextResponse.json(
+        {
+          rates: [],
+          error: "We currently only ship within the United States.",
+        },
+        { status: 200 }
+      );
     }
 
-    // compute total weight in ounces
-    const items: any[] = Array.isArray(body?.items) ? body.items : [];
-    const totalWeightOz = items.reduce((sum, li) => {
-      const qty = Math.max(1, Number(li?.quantity ?? li?.qty ?? 1));
-      const oz = Number(li?.weightOz ?? 0);
-      return sum + qty * oz;
-    }, 0);
+    if (!toAddress.zip) {
+      return NextResponse.json(
+        {
+          rates: [],
+          error: "Please enter a valid U.S. ZIP code.",
+        },
+        { status: 200 }
+      );
+    }
 
-    // fixed parcel dimensions for now
-    const parcel = {
-      length: 8,
-      width: 6,
-      height: 4,
-      distance_unit: "in",
-      weight: Math.max(1, Math.round(totalWeightOz || 1)),
-      mass_unit: "oz",
-    };
+    const items: any[] = Array.isArray(body?.items) ? body.items : [];
+
+    // use product-name logic
+    const { bottles, gallons } = parseUnits(items);
+    const parcels = buildParcelsFromCounts(bottles, gallons);
 
     // Call Shippo API to create shipment and get rates
     const resp = await fetch("https://api.goshippo.com/shipments/", {
@@ -112,7 +229,7 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         address_from: ORIGIN,
         address_to: toAddress,
-        parcels: [parcel],
+        parcels,
         async: false,
         carrier_accounts: process.env.SHIPPO_UPS_ACCOUNT_ID ? [process.env.SHIPPO_UPS_ACCOUNT_ID] : undefined,
       }),
@@ -122,23 +239,65 @@ export async function POST(req: Request) {
       const txt = await resp.text();
       return NextResponse.json(
         { rates: [], error: txt || "Shippo error" },
-        { status: 200 },
+        { status: 200 }
       );
     }
 
     const shipment = await resp.json();
-    const rawRates: any[] = shipment?.rates ?? [];
+    const rawRates: any[] = Array.isArray(shipment?.rates) ? shipment.rates : [];
 
-    // UPS ONLY — filter/normalize into UI format
-    const rates = rawRates
-      .filter((r) => r.currency === "USD" && String(r.provider).toUpperCase() === "UPS")
+    // 1) try strict UPS Ground first
+    let usableRates = rawRates.filter((r) => {
+      const token = String(r?.servicelevel?.token ?? "").toLowerCase();
+      return r.currency === "USD" && token === "ups_ground";
+    });
+
+    // TODO: check if this is what they want
+    // 2) if that returns nothing but there ARE UPS rates, fall back to "any UPS" so there's something
+    if (!usableRates.length) {
+      const upsAny = rawRates.filter((r) => {
+        const provider = String(r.provider ?? "").toUpperCase();
+        return r.currency === "USD" && provider.includes("UPS");
+      });
+      usableRates = upsAny;
+    }
+
+    // 3) if there's still nothing, return a clear error
+    if (!usableRates.length) {
+      const messages = Array.isArray(shipment?.messages)
+        ? shipment.messages
+            .map((m: any) => m?.text || m?.code || JSON.stringify(m))
+            .join(" | ")
+        : "No messages from Shippo";
+
+      console.error("No usable UPS rates from Shippo", {
+        toAddress,
+        parcels,
+        rawRatesCount: rawRates.length,
+        shipmentMessages: shipment?.messages,
+      });
+
+      return NextResponse.json(
+        {
+          rates: [],
+          error:
+            "No UPS shipping rates were returned for this address. Error: " +
+            messages,
+        },
+        { status: 200 }
+      );
+    }
+
+    const rates = usableRates
       .map((r) => {
         const est = Number(r.estimated_days) || undefined;
         return {
           id: String(r.object_id),
           label: r?.servicelevel?.name
             ? `UPS ${r.servicelevel.name}`
-            : (r?.servicelevel?.token ? `UPS ${r.servicelevel.token}` : "UPS"),
+            : r?.servicelevel?.token
+            ? `UPS ${r.servicelevel.token}`
+            : "UPS",
           amount: Math.round(Number(r.amount) * 100),
           daysMin: est ?? 2,
           daysMax: est ? est + 1 : 5,
@@ -151,7 +310,7 @@ export async function POST(req: Request) {
     console.error("[/api/shipping] error:", e?.message);
     return NextResponse.json(
       { rates: [], error: "quote failed" },
-      { status: 200 },
+      { status: 200 }
     );
   }
 }

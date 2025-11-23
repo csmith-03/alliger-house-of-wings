@@ -120,6 +120,9 @@ export default function ConfirmationPage() {
     shipping_cents,
     tax,
     cart,
+    shipping_label,
+    shipping_days_min,
+    shipping_days_max,
   } = order;
 
   const cartItems: Array<{
@@ -143,6 +146,23 @@ export default function ConfirmationPage() {
       : Math.max(0, (amount ?? 0) - (shipping_cents ?? 0) - displaySubtotal);
   const displayTotal =
     amount ?? (displaySubtotal + (shipping_cents ?? 0) + (displayTax ?? 0));
+
+    const shippingServiceLabel = shipping_label || "UPS Ground";
+
+    const shippingEtaLabel = (() => {
+      const min = Number(shipping_days_min ?? 0) || undefined;
+      const max = Number(shipping_days_max ?? 0) || undefined;
+
+      if (min && max && min !== max) {
+        return `Estimated ${min}-${max} business days`;
+      }
+      if (min || max) {
+        const d = min ?? max;
+        return `Estimated ${d} business day${d === 1 ? "" : "s"}`;
+      }
+      return undefined;
+    })();
+
 
   const money = (cents: number) =>
     (Math.max(0, Math.round(cents)) / 100).toFixed(2);
@@ -251,6 +271,11 @@ export default function ConfirmationPage() {
               <div className="flex justify-between">
                 <dt>Shipping</dt>
                 <dd>${money(shipping_cents ?? 0)}</dd>
+              </div>
+              <div className="text-xs text-foreground/60">
+                {shippingEtaLabel
+                  ? `${shippingServiceLabel} · ${shippingEtaLabel}`
+                  : shippingServiceLabel}
               </div>
               <div className="flex justify-between">
                 <dt>Tax</dt>

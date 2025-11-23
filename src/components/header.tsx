@@ -74,22 +74,15 @@ export default function Header() {
       ? "bg-rooster/10 text-rooster"
       : "bg-maroon/10 text-maroon";
 
-  const handleBarMenu = (e: React.MouseEvent) => {
-    e.preventDefault();
-    const url = "/Bar%20Menu.pdf"; // file placed in /public
-    // Open in new tab
-    window.open(url, "_blank", "noopener,noreferrer");
-    // Trigger download
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "Bar Menu.pdf";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-  };
   return (
     <>
-      <header className="sticky top-0 z-10 bg-pure/80 dark:bg-black/30 backdrop-blur border-b border-black/10 dark:border-white/10">
+<header
+  className={`sticky top-0 z-10 border-b ${
+    theme === "dark"
+      ? "bg-black border-white/10"
+      : "bg-white border-black/10"
+  }`}
+>
         <div className="w-full px-4 sm:px-6 lg:px-8 py-3 sm:py-4 flex items-center">
           <Link href="/" aria-label="Home" className="flex items-center gap-3">
             <img
@@ -129,22 +122,14 @@ export default function Header() {
 
             <div className="hidden md:flex items-center gap-2">
               {navLink("/", "Home", Utensils)}
+              {navLink("/menu", "Bar Menu", FileDown)}
               {navLink("/sauces", "Sauces", Flame)}
-              {navLink("/recipes", "Recipes", NotebookPen)} {/* New Recipes link */}
+              {navLink("/recipes", "Recipes", NotebookPen)}
               {navLink("/benefits", "Benefits", HeartPulse)}
               {navLink("/about", "About", Info)}
-              {navLink("/contact", "Contact", Mail)} {/* New Contact link */}
+              {navLink("/contact", "Contact", Mail)}
               <CartMini />
             </div>
-
-            <button
-              type="button"
-              onClick={handleBarMenu}
-              aria-label="Open and download Bar Menu PDF"
-              className="hidden md:inline-flex items-center justify-center h-9 w-9 rounded-full border border-foreground/20 text-foreground/80 hover:bg-foreground/5"
-            >
-              <FileDown className="h-4 w-4" />
-            </button>
 
             <button
               type="button"
@@ -172,7 +157,6 @@ export default function Header() {
                   <Moon className="h-4 w-4" />
                 ))}
             </button>
-            {/* Optional external shop button(s) can remain here */}
           </nav>
         </div>
       </header>
@@ -215,10 +199,10 @@ export default function Header() {
         <nav className="p-4 flex flex-col gap-2">
           <Link
             onClick={() => setOpen(false)}
-            href="/"
+            href="/menu"
             className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5"
           >
-            <Utensils className="h-4 w-4" /> Menu
+            <Utensils className="h-4 w-4" /> Bar Menu
           </Link>
           <Link
             onClick={() => setOpen(false)}

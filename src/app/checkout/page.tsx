@@ -3,7 +3,7 @@
  *
  * Flow (three phases):
  *   1) Address: user enters and confirms shipping address (Stripe AddressElement).
- *   2) Shipping: we POST /api/shipping with { address, items } to fetch USPS rates; user picks one.
+ *   2) Shipping: we POST /api/shipping with { address, items } to fetch UPS rates; user picks one.
  *   3) Payment: we POST /api/stripe with { items, currency, shipCents, address, rateId } to create a PaymentIntent,
  *      then render <PaymentElement> and confirm the payment (redirect).
  *
@@ -46,6 +46,11 @@ const stripePromise = loadStripe(
 export default function CheckoutPage() {
   const { items, currency } = useCart();
   const { theme } = useTheme?.() || { theme: "dark" };
+
+  const [clientReady, setClientReady] = useState(false);
+  useEffect(() => {
+    setClientReady(true);
+  }, []);
   
   // normalize cart and compute base totals (no destination tax/shipping yet)
   const norm = useMemo(() => sanitize(items), [items]);
@@ -77,6 +82,11 @@ export default function CheckoutPage() {
       throw new Error("Address and shipping must be selected.");
     }
     const shipCents = Math.max(0, Math.round(Number(chosen.amount) || 0));
+
+    const shipLabel = chosen?.label || "UPS Ground";
+    const shipDaysMin = Number(chosen?.daysMin ?? 0) || null;
+    const shipDaysMax = Number(chosen?.daysMax ?? 0) || null;
+
     const res = await fetch("/api/stripe", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -89,6 +99,9 @@ export default function CheckoutPage() {
         shipCents,
         address: addr,
         rateId: chosen.id,
+        shipLabel,
+        shipDaysMin,
+        shipDaysMax,
       }),
     });
     const data = await res.json();
@@ -108,29 +121,48 @@ export default function CheckoutPage() {
         setBusyRates(true);
         setUiErr(null);
 
-        // get USPS rates based on current address + cart from API
         const res = await fetch("/api/shipping", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          address: addr,
-          items: norm.map((it) => ({
-            quantity: Number(it.quantity ?? 1),
-            weightOz: Number(it.weightOz ?? 0),
-          })),
-        }),
+          body: JSON.stringify({
+            address: addr,
+            items: norm.map((it) => ({
+              name: it.name,
+              quantity: Number(it.quantity ?? 1),
+            })),
+          }),
         });
+
         const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "Failed to fetch rates.");
         if (cancelled) return;
 
-        // populate shipping options ()keep prior selection if present, otherwise pick first)
-        setShipOpts(data?.rates ?? []);
-        setChosen((prev: any) => prev ?? data?.rates?.[0] ?? null);
+        if (!res.ok) {
+          throw new Error(data?.error || "Failed to fetch rates.");
+        }
+
+        const rates: any[] = Array.isArray(data?.rates) ? data.rates : [];
+
+        // if Shippo returns no usable rates, treat as an error
+        if (!rates.length) {
+          throw new Error(
+            data?.error ||
+              "No UPS Ground shipping options are available for this address. Please check the address and try again."
+          );
+        }
+        setShipOpts(rates);
+        setChosen(rates[0] ?? null);
+
       } catch (e: any) {
-        if (!cancelled) setUiErr(e?.message || "Could not get rates.");
+        if (!cancelled) {
+          console.error("Shipping quote error:", e);
+          setUiErr(e?.message || "Could not get rates.");
+          setShipOpts([]);
+          setChosen(null);
+        }
       } finally {
-        if (!cancelled) setBusyRates(false);
+        if (!cancelled) {
+          setBusyRates(false);
+        }
       }
     })();
 
@@ -219,11 +251,15 @@ export default function CheckoutPage() {
 
   // shipping label logic for OrderSummary
   type ShipPhase = "beforeAddress" | "selectRate" | "ready";
-  const shippingPhase: ShipPhase = !addrConfirmed
-    ? "beforeAddress"
-    : chosen
+
+  const shippingPhase: ShipPhase =
+    !addrConfirmed
+      ? "beforeAddress"
+      : busyRates
+      ? "selectRate"
+      : chosen
       ? "ready"
-      : "selectRate";
+      : "beforeAddress";
 
   // normalize shipping cents for summary (null when N/A)
   const selectedShipping: number | null =
@@ -231,16 +267,30 @@ export default function CheckoutPage() {
       ? Math.max(0, Math.round(Number(chosen!.amount) || 0))
       : null;
 
-  // address-aware tax preview
-  // TODO: integrate Stripe Tax and fix this
-  const taxPreview =
-    addrConfirmed && addr
-      ? estimateTax({
-          subTotal: base.subtotal,
-          shippingCents: selectedShipping ?? 0,
-          toAddress: addr,
-        })
-      : base.tax;
+  const shippingServiceLabel =
+    shippingPhase === "ready" && chosen?.label
+      ? chosen.label
+      : "UPS Ground";
+
+  const shippingEtaLabel =
+    shippingPhase === "ready" && chosen
+      ? (() => {
+          const min = Number(chosen.daysMin) || undefined;
+          const max = Number(chosen.daysMax) || undefined;
+
+          if (min && max && min !== max) {
+            return `Estimated ${min}-${max} business days`;
+          }
+
+          if (min || max) {
+            const d = min ?? max;
+            return `Estimated ${d} business day${d === 1 ? "" : "s"}`;
+          }
+
+          return undefined;
+        })()
+      : undefined;
+  const taxPreview = 0;
 
   return (
     <main>
@@ -248,7 +298,7 @@ export default function CheckoutPage() {
         <h1 className="text-3xl font-bold mb-6">Checkout</h1>
 
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* LEFT: Address / USPS / Payment */}
+          {/* LEFT: Address / UPS / Payment */}
           <section className="lg:col-span-2 space-y-4">
             <Elements
               stripe={stripePromise}
@@ -298,6 +348,8 @@ export default function CheckoutPage() {
 
           {/* RIGHT: Summary and cart items */}
           <aside className="lg:col-span-1 space-y-4">
+            {clientReady && (
+              <>
             <OrderSummary
               subtotal={base.subtotal}
               tax={taxPreview}
@@ -305,6 +357,8 @@ export default function CheckoutPage() {
               shippingPhase={shippingPhase}
               cartDisabled={cartDisabled}
               theme={theme}
+              shippingServiceLabel={shippingServiceLabel}
+              shippingEtaLabel={shippingEtaLabel}
             />
 
             <div
@@ -317,6 +371,8 @@ export default function CheckoutPage() {
               <h2 className="text-base font-semibold mb-2">Your Cart</h2>
               <CartItems items={norm} theme={theme} />
             </div>
+              </>
+            )}
           </aside>
         </div>
       </div>
@@ -364,16 +420,30 @@ function CheckoutFlowUI(props: {
     setPayBusy(true);
     setPayErr(null);
     try {
-      // Create PI now
+      // 1) Ask Stripe to validate and collect any extra info
+      const { error: submitError } = await elements.submit();
+      if (submitError) {
+        setPayErr(submitError.message || "Please check your details and try again.");
+        setPayBusy(false);
+        return;
+      }
+
+      // 2) Do async work: create PaymentIntent
       const clientSecret = await props.createPaymentIntent();
+
+      // 3) Confirm the payment with the PI
       const { error } = await stripe.confirmPayment({
         elements,
         clientSecret,
         confirmParams: {
-          return_url: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/checkout/confirmation`,
+          return_url: `${
+            process.env.NEXT_PUBLIC_SITE_URL ?? ""
+          }/checkout/confirmation`,
         },
       });
-      if (error) setPayErr(error.message || "Payment failed. Please try again.");
+      if (error) {
+        setPayErr("Payment failed. Please check your details and try again.");
+      }
     } catch (e: any) {
       setPayErr(e?.message || "Could not start payment.");
     } finally {
@@ -381,8 +451,10 @@ function CheckoutFlowUI(props: {
     }
   }
 
-  const canShowPayment =
-    props.addrConfirmed && !!props.chosen && !props.busyRates && !props.cartDisabled;
+    const canShowPayment =
+      props.addrConfirmed && !!props.chosen && !props.cartDisabled;
+    const showLoading =
+      props.addrConfirmed && props.busyRates && !props.cartDisabled;
 
   return (
     <form className="space-y-4">
@@ -462,57 +534,6 @@ function CheckoutFlowUI(props: {
         )}
       </section>
 
-      {/* USPS shipping options */}
-      <section className={`rounded-md border p-4 ${themeClass.surface}`}>
-        <h2 className="text-lg font-semibold mb-2">USPS Shipping</h2>
-
-        {!props.addrConfirmed ? (
-          <p className="text-sm text-foreground/60">
-            Confirm your address to see USPS options.
-          </p>
-        ) : props.busyRates ? (
-          <div className="flex justify-center items-center py-8">
-            <Loader2
-              className={`animate-spin h-8 w-8 ${
-                theme === "dark" ? "text-gray-300" : "text-gray-600"
-              }`}
-            />
-          </div>
-        ) : props.shipOpts.length === 0 ? (
-          <p className="text-sm text-red-600">
-            No rates available. Try editing your address.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {props.shipOpts.map((opt) => (
-              <label
-                key={opt.id}
-                className={`flex items-center justify-between rounded-md border p-3 text-sm hover:bg-[color:var(--surface-muted)] ${themeClass.surface} ${themeClass.border}`}
-              >
-                <div className="flex items-center gap-3">
-                  <input
-                    type="radio"
-                    name="ship"
-                    checked={props.chosen?.id === opt.id}
-                    onChange={() => props.setChosen(opt)}
-                    style={{
-                      accentColor: theme === "dark" ? "#dfa32e" : "#7a0d0d",
-                    }}
-                  />
-                  <div>
-                    <div className="font-medium">{opt.label}</div>
-                    <div className={themeClass.textMuted}>
-                      {opt.daysMin}–{opt.daysMax} days
-                    </div>
-                  </div>
-                </div>
-                <div className="font-medium">${money(opt.amount)}</div>
-              </label>
-            ))}
-          </div>
-        )}
-      </section>
-
       {/* Payment */}
       {props.uiErr && (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
@@ -535,11 +556,29 @@ function CheckoutFlowUI(props: {
             type="button"
             onClick={handlePay}
             disabled={payBusy}
-            className={`w-full rounded-md py-2.5 font-medium text-white bg-[#7a0d0d] hover:brightness-110 ${payBusy ? "opacity-60 cursor-not-allowed" : ""}`}
+            className={`w-full rounded-md py-2.5 font-medium text-white bg-[#7a0d0d] hover:brightness-110 ${
+              payBusy ? "opacity-60 cursor-not-allowed" : ""}`}
           >
             {payBusy ? "Processing…" : "Pay"}
           </button>
         </>
+      ) : showLoading ? (
+        // only show this while fetching rates
+        <section
+          className={`rounded-md border p-6 text-center ${themeClass.surface}`}
+        >
+          <h2 className="text-lg font-semibold mb-4">
+            Calculating shipping…
+          </h2>
+
+          <div className="flex justify-center items-center py-6">
+            <Loader2
+              className={`animate-spin h-10 w-10 ${
+                theme === "dark" ? "text-gray-300" : "text-gray-600"
+              }`}
+            />
+          </div>
+        </section>
       ) : null}
       
     </form>

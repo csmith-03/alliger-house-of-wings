@@ -53,6 +53,19 @@ export async function GET(_: Request, { params }: { params: { pi: string } }) {
 
     // parse metadata and cart details
     const md = pi.metadata || {};
+
+    const shippingLabel = (md.ship_label as string) || "UPS Ground";
+
+    const shippingDaysMinRaw = md.ship_days_min as string | undefined;
+    const shippingDaysMaxRaw = md.ship_days_max as string | undefined;
+
+    const shippingDaysMin = shippingDaysMinRaw
+      ? Number(shippingDaysMinRaw)
+      : null;
+    const shippingDaysMax = shippingDaysMaxRaw
+      ? Number(shippingDaysMaxRaw)
+      : null;
+
     let cartParsed: Array<{
       id: string;
       name: string;
@@ -118,6 +131,9 @@ export async function GET(_: Request, { params }: { params: { pi: string } }) {
       rate_id: md.rate_id ?? "",
       cart: cartParsed, // array of { id, name, quantity, unitAmount }
       status: pi.status,
+      shipping_label: shippingLabel,
+      shipping_days_min: shippingDaysMin,
+      shipping_days_max: shippingDaysMax,
     });
   } catch (err: any) {
     console.error(err);
