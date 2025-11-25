@@ -3,21 +3,19 @@
  *
  * Flow (three phases):
  *   1) Address: user enters and confirms shipping address (Stripe AddressElement).
- *   2) Shipping: we POST /api/shipping with { address, items } to fetch USPS rates; user picks one.
- *   3) Payment: we POST /api/stripe with { items, currency, shipCents, address, rateId } to create a PaymentIntent,
- *      then render <PaymentElement> and confirm the payment (redirect).
+ *   2) Shipping: we POST /api/shipping with { address, items } to fetch UPS rates; user picks one.
+ *   3) Payment: on Pay click we POST /api/stripe to create a PaymentIntent, then confirm it.
  *
  * State overview:
- *   - addr / addrComplete / addrConfirmed / editingAddress: address capture + confirmation.
- *   - shipOpts / chosen / busyRates: shipping quotes and selection.
- *   - clientSecret / uiErr: PaymentIntent lifecycle + UI error surface.
+ *   - addr / addrComplete / addrConfirmed / editingAddress
+ *   - shipOpts / chosen / busyRates
+ *   - uiErr: general UI error surface
  *
  * Rendering strategy:
- *   - Keep <Elements> mounted; once clientSecret exists, we pass it via options to render PaymentElement.
- *   - Right-hand OrderSummary recomputes subtotals/tax and shows selected shipping if present.
+ *   - Elements mounted in deferred mode (no clientSecret until Pay).
+ *   - Right-hand OrderSummary recomputes totals with selected shipping.
  */
 
-// TODO: split up into sub-components
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -26,7 +24,7 @@ import { Pencil, Loader2 } from "lucide-react";
 import { getThemeClasses } from "@/components/class-themes";
 import CartItems from "@/components/cart/CartItems";
 import OrderSummary from "@/components/cart/OrderSummary";
-//import { useRouter } from "next/navigation";
+// import { useRouter } from "next/navigation";
 import { useTheme } from "@/app/theme-provider";
 import {
   Elements,
@@ -46,7 +44,7 @@ const stripePromise = loadStripe(
 export default function CheckoutPage() {
   const { items, currency } = useCart();
   const { theme } = useTheme?.() || { theme: "dark" };
-  
+
   // normalize cart and compute base totals (no destination tax/shipping yet)
   const norm = useMemo(() => sanitize(items), [items]);
   const base = useMemo(() => breakdown(norm, 0), [norm]);
@@ -68,10 +66,10 @@ export default function CheckoutPage() {
   const [chosen, setChosen] = useState<any | null>(null);
   const [busyRates, setBusyRates] = useState(false);
 
-  // Stripe PaymentIntent (created when address and rate are ready)
-  //Secret, setClientSecret] = useState<string | null>(null);
+  // UI error
   const [uiErr, setUiErr] = useState<string | null>(null);
 
+  // Create PaymentIntent only when user clicks Pay
   const createPaymentIntent = async (): Promise<string> => {
     if (!addrConfirmed || !addr || !chosen) {
       throw new Error("Address and shipping must be selected.");
@@ -108,23 +106,21 @@ export default function CheckoutPage() {
         setBusyRates(true);
         setUiErr(null);
 
-        // get USPS rates based on current address + cart from API
         const res = await fetch("/api/shipping", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          address: addr,
-          items: norm.map((it) => ({
-            quantity: Number(it.quantity ?? 1),
-            weightOz: Number(it.weightOz ?? 0),
-          })),
-        }),
+          body: JSON.stringify({
+            address: addr,
+            items: norm.map((it) => ({
+              quantity: Number(it.quantity ?? 1),
+              weightOz: Number(it.weightOz ?? 0),
+            })),
+          }),
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data?.error || "Failed to fetch rates.");
         if (cancelled) return;
 
-        // populate shipping options ()keep prior selection if present, otherwise pick first)
         setShipOpts(data?.rates ?? []);
         setChosen((prev: any) => prev ?? data?.rates?.[0] ?? null);
       } catch (e: any) {
@@ -139,82 +135,27 @@ export default function CheckoutPage() {
     };
   }, [addrConfirmed, addr, JSON.stringify(norm), cartDisabled]);
 
-  // // Phase 3: create/refresh PaymentIntent once address + rate are ready
-  // useEffect(() => {
-  //   const ready = addrConfirmed && !!addr && !!chosen && !cartDisabled;
-  //   if (!ready) return;
-
-  //   let cancelled = false;
-  //   (async () => {
-  //     try {
-  //       setUiErr(null);
-
-  //       // normalize shipping cents to match UI
-  //       const shipCents = Math.max(0, Math.round(Number(chosen!.amount) || 0));
-
-  //       // create PaymentIntent for full amount (subtotal + ship + tax)
-  //       const res = await fetch("/api/stripe", {
-  //         method: "POST",
-  //         headers: { "Content-Type": "application/json" },
-  //         body: JSON.stringify({
-  //           items: norm.map((it) => ({
-  //             id: String(it.id),
-  //             quantity: Number(it.quantity ?? 1),
-  //           })),
-  //           currency: safeCurrency,
-  //           shipCents,
-  //           address: addr,
-  //           rateId: chosen!.id,
-  //         }),
-  //       });
-  //       const data = await res.json();
-  //       if (!res.ok || !data?.clientSecret) {
-  //         throw new Error(data?.error || "Couldn't start payment.");
-  //       }
-  //       // store clientSecret so <Elements> can render <PaymentElement>
-  //       if (!cancelled) setClientSecret(data.clientSecret);
-  //     } catch (e: any) {
-  //       if (!cancelled) setUiErr(e?.message || "Payment setup failed.");
-  //     }
-  //   })();
-
-  //   return () => {
-  //     cancelled = true;
-  //   };
-  // }, [
-  //   addrConfirmed,
-  //   addr?.postal_code,
-  //   addr?.line1,
-  //   addr?.city,
-  //   addr?.state,
-  //   chosen?.id,
-  //   JSON.stringify(norm),
-  //   safeCurrency,
-  //   cartDisabled,
-  // ]);
-  
-  // keep <Elements> stable until PI exists (prevents address form reset)
+  // Elements deferred mode
   const elementsOptions = useMemo(() => {
-  const appearance = {
-    theme: theme === "dark" ? "night" as const : "stripe" as const,
-    labels: "floating" as const,
-    variables: {
-      colorPrimary: theme === "dark" ? "#e0e0e0" : "#202020",
-      colorBackground: theme === "dark" ? "#121212" : "#ffffff",
-      colorText: theme === "dark" ? "#e0e0e0" : "#202020",
-      colorDanger: "#df1b41",
-      fontFamily: '"Inter", sans-serif',
-    }
-  };
+    const appearance = {
+      theme: theme === "dark" ? ("night" as const) : ("stripe" as const),
+      labels: "floating" as const,
+      variables: {
+        colorPrimary: theme === "dark" ? "#e0e0e0" : "#202020",
+        colorBackground: theme === "dark" ? "#121212" : "#ffffff",
+        colorText: theme === "dark" ? "#e0e0e0" : "#202020",
+        colorDanger: "#df1b41",
+        fontFamily: '"Inter", sans-serif',
+      },
+    };
+    return {
+      mode: "payment" as const,
+      currency: safeCurrency,
+      amount: Math.max(50, base.total),
+      appearance,
+    };
+  }, [safeCurrency, base.total, theme]);
 
-  return {
-    mode: "payment" as const,
-    currency: safeCurrency,
-    amount: Math.max(50, base.total),
-    appearance,
-  };
-}, [safeCurrency, base.total, theme]);
-  // change key - forces Elements to remount when PI is available
   const elementsKey = `${theme}_deferred`;
 
   // shipping label logic for OrderSummary
@@ -222,17 +163,16 @@ export default function CheckoutPage() {
   const shippingPhase: ShipPhase = !addrConfirmed
     ? "beforeAddress"
     : chosen
-      ? "ready"
-      : "selectRate";
+    ? "ready"
+    : "selectRate";
 
-  // normalize shipping cents for summary (null when N/A)
+  // normalize shipping cents for summary
   const selectedShipping: number | null =
     shippingPhase === "ready"
       ? Math.max(0, Math.round(Number(chosen!.amount) || 0))
       : null;
 
-  // address-aware tax preview
-  // TODO: integrate Stripe Tax and fix this
+  // address-aware tax preview (placeholder logic)
   const taxPreview =
     addrConfirmed && addr
       ? estimateTax({
@@ -248,7 +188,7 @@ export default function CheckoutPage() {
         <h1 className="text-3xl font-bold mb-6">Checkout</h1>
 
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* LEFT: Address / USPS / Payment */}
+          {/* LEFT: Address / Shipping / Payment */}
           <section className="lg:col-span-2 space-y-4">
             <Elements
               stripe={stripePromise}
@@ -257,7 +197,6 @@ export default function CheckoutPage() {
             >
               <CheckoutFlowUI
                 cartDisabled={cartDisabled}
-                // address properties
                 addr={addr}
                 addrComplete={addrComplete}
                 addrConfirmed={addrConfirmed}
@@ -267,57 +206,53 @@ export default function CheckoutPage() {
                   setAddrComplete(complete);
                 }}
                 onConfirmAddress={() => {
-                  if (!addrComplete) return; // require form to be completed
+                  if (!addrComplete) return;
                   setAddrConfirmed(true);
                   setEditingAddress(false);
                   setUiErr(null);
                   setShipOpts([]);
                   setChosen(null);
-                  //setClientSecret(null);
+                  // clientSecret reset commented (deferred)
                 }}
-                // going back to edit address clears quotes, selection, PI
                 onEditAddress={() => {
                   setEditingAddress(true);
                   setAddrConfirmed(false);
                   setShipOpts([]);
                   setChosen(null);
-                  //setClientSecret(null);
+                  // clientSecret reset commented (deferred)
                 }}
-                // shipping properties
                 shipOpts={shipOpts}
                 chosen={chosen}
                 setChosen={(opt) => setChosen(opt)}
                 busyRates={busyRates}
-                // payment UI status
                 uiErr={uiErr}
-                //hasClientSecret={!!clientSecret}
                 createPaymentIntent={createPaymentIntent}
               />
             </Elements>
           </section>
 
-          {/* RIGHT: Summary and cart items */}
-          <aside className="lg:col-span-1 space-y-4">
-            <OrderSummary
-              subtotal={base.subtotal}
-              tax={taxPreview}
-              chosenShippingCents={selectedShipping}
-              shippingPhase={shippingPhase}
-              cartDisabled={cartDisabled}
-              theme={theme}
-            />
+            {/* RIGHT: Summary and cart items */}
+            <aside className="lg:col-span-1 space-y-4">
+              <OrderSummary
+                subtotal={base.subtotal}
+                tax={taxPreview}
+                chosenShippingCents={selectedShipping}
+                shippingPhase={shippingPhase}
+                cartDisabled={cartDisabled}
+                theme={theme}
+              />
 
-            <div
-              className={`rounded-md border p-4 ${
-                theme === "dark"
-                  ? "border-[color:var(--surface-border-strong)] bg-[color:var(--surface)] text-[color:var(--foreground)]"
-                  : "border-[color:var(--surface-border-strong)] bg-white text-[color:var(--foreground)]"
-              }`}
-            >
-              <h2 className="text-base font-semibold mb-2">Your Cart</h2>
-              <CartItems items={norm} theme={theme} />
-            </div>
-          </aside>
+              <div
+                className={`rounded-md border p-4 ${
+                  theme === "dark"
+                    ? "border-[color:var(--surface-border-strong)] bg-[color:var(--surface)] text-[color:var(--foreground)]"
+                    : "border-[color:var(--surface-border-strong)] bg-white text-[color:var(--foreground)]"
+                }`}
+              >
+                <h2 className="text-base font-semibold mb-2">Your Cart</h2>
+                <CartItems items={norm} theme={theme} />
+              </div>
+            </aside>
         </div>
       </div>
     </main>
@@ -326,8 +261,6 @@ export default function CheckoutPage() {
 
 function CheckoutFlowUI(props: {
   cartDisabled: boolean;
-
-  // address
   addr: any;
   addrComplete: boolean;
   addrConfirmed: boolean;
@@ -335,54 +268,61 @@ function CheckoutFlowUI(props: {
   onAddressChange: (a: any, complete: boolean) => void;
   onConfirmAddress: () => void;
   onEditAddress: () => void;
-
-  // shipping
   shipOpts: any[];
   chosen: any | null;
   setChosen: (o: any) => void;
   busyRates: boolean;
-
-  // payment
   uiErr: string | null;
   createPaymentIntent: () => Promise<string>;
-  //hasClientSecret: boolean;
 }) {
   const stripe = useStripe();
   const elements = useElements();
-  //const router = useRouter();
+  // const router = useRouter();
   const { theme } = useTheme?.() || { theme: "dark" };
   const themeClass = getThemeClasses(theme);
   const [payBusy, setPayBusy] = useState(false);
   const [payErr, setPayErr] = useState<string | null>(null);
 
-  // can't confirm address until it's complete and we're not fetching rates
   const canConfirmAddress = props.addrComplete && !props.busyRates;
+  const canShowPayment =
+    props.addrConfirmed && !!props.chosen && !props.busyRates && !props.cartDisabled;
 
-  // Submit payment handler to Stripe, redirect to confirmation page
   async function handlePay() {
     if (!stripe || !elements) return;
     setPayBusy(true);
     setPayErr(null);
     try {
-      // Create PI now
+      // Stripe requires elements.submit() first (validation)
+      const { error: submitErr } = await elements.submit();
+      if (submitErr) {
+        setPayErr(submitErr.message || "Please check your details.");
+        setPayBusy(false);
+        return;
+      }
+
+      // Create PaymentIntent now
       const clientSecret = await props.createPaymentIntent();
+      const origin =
+        typeof window !== "undefined"
+          ? window.location.origin
+          : (process.env.NEXT_PUBLIC_SITE_URL ?? "");
+
       const { error } = await stripe.confirmPayment({
         elements,
         clientSecret,
         confirmParams: {
-          return_url: `${process.env.NEXT_PUBLIC_SITE_URL ?? ""}/checkout/confirmation`,
+          return_url: `${origin}/checkout/confirmation`,
         },
       });
-      if (error) setPayErr(error.message || "Payment failed. Please try again.");
+      if (error) {
+        setPayErr(error.message || "Payment failed. Please try again.");
+      }
     } catch (e: any) {
       setPayErr(e?.message || "Could not start payment.");
     } finally {
       setPayBusy(false);
     }
   }
-
-  const canShowPayment =
-    props.addrConfirmed && !!props.chosen && !props.busyRates && !props.cartDisabled;
 
   return (
     <form className="space-y-4">
@@ -397,13 +337,11 @@ function CheckoutFlowUI(props: {
                 mode: "shipping",
                 allowedCountries: ["US"],
                 fields: { phone: "never" },
-                // keeps the full form open (optional - can change)
                 defaultValues: {
                   address: { country: "US", state: "NY" },
                 },
               }}
               onChange={(e) => {
-                // flatten nested address for the state we use
                 const a = e.value?.address || {};
                 const flat = {
                   name: e.value?.name || "",
@@ -432,7 +370,6 @@ function CheckoutFlowUI(props: {
             </div>
           </>
         ) : (
-          // read-only summary with edit
           <div className="space-y-2">
             <div
               className={`relative rounded-md border p-3 text-sm ${themeClass.muted} ${themeClass.border}`}
@@ -441,8 +378,7 @@ function CheckoutFlowUI(props: {
               <div>{props.addr?.line1}</div>
               {props.addr?.line2 ? <div>{props.addr?.line2}</div> : null}
               <div>
-                {props.addr?.city}, {props.addr?.state}{" "}
-                {props.addr?.postal_code}
+                {props.addr?.city}, {props.addr?.state} {props.addr?.postal_code}
               </div>
               <div>{props.addr?.country || "US"}</div>
               <button
@@ -462,13 +398,13 @@ function CheckoutFlowUI(props: {
         )}
       </section>
 
-      {/* USPS shipping options */}
+      {/* UPS shipping options */}
       <section className={`rounded-md border p-4 ${themeClass.surface}`}>
-        <h2 className="text-lg font-semibold mb-2">USPS Shipping</h2>
+        <h2 className="text-lg font-semibold mb-2">UPS Shipping</h2>
 
         {!props.addrConfirmed ? (
           <p className="text-sm text-foreground/60">
-            Confirm your address to see USPS options.
+            Confirm your address to see UPS options.
           </p>
         ) : props.busyRates ? (
           <div className="flex justify-center items-center py-8">
@@ -513,13 +449,14 @@ function CheckoutFlowUI(props: {
         )}
       </section>
 
-      {/* Payment */}
+      {/* General error */}
       {props.uiErr && (
         <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {props.uiErr}
         </div>
       )}
 
+      {/* Payment (deferred) */}
       {canShowPayment ? (
         <>
           {payErr && (
@@ -534,14 +471,15 @@ function CheckoutFlowUI(props: {
           <button
             type="button"
             onClick={handlePay}
-            disabled={payBusy}
-            className={`w-full rounded-md py-2.5 font-medium text-white bg-[#7a0d0d] hover:brightness-110 ${payBusy ? "opacity-60 cursor-not-allowed" : ""}`}
+            disabled={payBusy || !stripe || !elements}
+            className={`w-full rounded-md py-2.5 font-medium text-white bg-[#7a0d0d] hover:brightness-110 ${
+              payBusy ? "opacity-60 cursor-not-allowed" : ""
+            }`}
           >
             {payBusy ? "Processing…" : "Pay"}
           </button>
         </>
       ) : null}
-      
     </form>
   );
 }

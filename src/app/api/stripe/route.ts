@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     // normalize missing prices from Stripe
     const enriched = await Promise.all(
       safeItems.map(async (it) => {
-        const productId = String(it.productId ?? it.id);
+        const productId = String(it.id);
         let unitAmount = Number(it.unitAmount ?? 0);
 
         // if unitAmount not provided, look up from Stripe
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
           id: productId,
           productId,
           unitAmount,
-          quantity: Number(it.qty ?? it.quantity ?? 1),
+          quantity: Number(it.quantity ?? 1),
         };
       })
     );
