@@ -1,5 +1,4 @@
 // API route: gets a PaymentIntent by id (pi) and returns details including variant prices.
-// NOTE: Remove explicit type annotation on 2nd arg (Next.js build error). Use `any` or omit typing.
 
 import { NextResponse } from "next/server";
 import { stripe } from "@/lib/stripe";
@@ -11,10 +10,10 @@ function variantName(base: string, price: any) {
   return base;
 }
 
-// FIX: do not constrain second argument's type; Next.js rejects custom type there.
-export async function GET(request: Request, context: any) {
+// FIX: use destructured second arg; Next.js rejects a named second parameter.
+export async function GET(request: Request, { params }: { params: { pi: string } }) {
   try {
-    const piId = context?.params?.pi;
+    const piId = params.pi;
     if (!piId) {
       return NextResponse.json({ error: "missing pi" }, { status: 400 });
     }
