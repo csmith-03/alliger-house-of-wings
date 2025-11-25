@@ -11,6 +11,8 @@ export async function POST(req: Request) {
       );
     }
 
+    // test
+
     // Instantiate after checking key (avoids build-time error)
     const resend = new Resend(apiKey);
 
