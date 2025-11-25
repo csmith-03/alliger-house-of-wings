@@ -23,7 +23,6 @@ interface CartCtx {
   shippingRate: any;
   setShippingRate: (rate: any) => void;
 }
-
 const CartContext = createContext<CartCtx | null>(null);
 const LS_KEY = "how_cart_v1";
 
@@ -44,17 +43,37 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     } catch {}
   }, [items]);
 
-  function add(item: Omit<CartItem,"qty">, qty=1) {
+  function add(item: Omit<CartItem,"qty">, qty = 1) {
     setItems(prev => {
-      const ex = prev.find(i => i.productId === item.productId);
-      if (ex) return prev.map(i => i.productId === item.productId ? { ...i, qty: i.qty + qty } : i);
+      // CHANGE: merge on productId + priceId (variant), not just productId
+      const ex = prev.find(i => i.productId === item.productId && i.priceId === item.priceId);
+      if (ex) {
+        return prev.map(i =>
+          i === ex ? { ...i, qty: i.qty + qty } : i
+        );
+      }
       return [...prev, { ...item, qty }];
     });
   }
-  function remove(productId: string) { setItems(p => p.filter(i => i.productId !== productId)); }
-  function setQty(productId: string, qty: number) {
-    if (qty <= 0) return remove(productId);
-    setItems(p => p.map(i => i.productId === productId ? { ...i, qty } : i));
+  function remove(productId: string, priceId?: string | null) {
+    // CHANGE: allow removing a specific variant; if priceId omitted remove all variants of product
+    setItems(p =>
+      priceId === undefined
+        ? p.filter(i => i.productId !== productId)
+        : p.filter(i => !(i.productId === productId && i.priceId === priceId))
+    );
+  }
+  function setQty(productId: string, qty: number, priceId?: string | null) {
+    if (qty <= 0) {
+      return remove(productId, priceId);
+    }
+    setItems(p =>
+      p.map(i =>
+        i.productId === productId && (priceId === undefined || i.priceId === priceId)
+          ? { ...i, qty }
+          : i
+      )
+    );
   }
   function clear() { setItems([]); }
 
@@ -65,8 +84,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 const value = useMemo(() => ({
     items,
     add,
-    remove,
-    setQty,
+    remove,        // NOTE: now accepts (productId, priceId?)
+    setQty,        // NOTE: now accepts (productId, qty, priceId?)
     clear,
     count,
     subtotal,
