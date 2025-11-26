@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 import { cookies } from "next/headers";
 import ConfirmationClient from "./ConfirmationClient";
 
