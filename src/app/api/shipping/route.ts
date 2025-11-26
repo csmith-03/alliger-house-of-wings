@@ -129,6 +129,16 @@ export async function POST(req: Request) {
     const shipment = await resp.json();
     const rawRates: any[] = shipment?.rates ?? [];
 
+    console.log("[/api/shipping] rawRates:", rawRates.map((r: any) => ({
+      provider: r.provider,
+      amount: r.amount,
+      currency: r.currency,
+      token: r.servicelevel?.token,
+      name: r.servicelevel?.name,
+    })));
+
+    console.log("[/api/shipping] shipment messages:", shipment?.messages);
+
     // UPS ONLY — filter/normalize into UI format
     const rates = rawRates
       .filter((r) => r.currency === "USD" && String(r.provider).toUpperCase() === "UPS")
