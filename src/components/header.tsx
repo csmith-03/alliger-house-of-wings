@@ -5,12 +5,11 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useTheme } from "../app/theme-provider";
 import { CartMini } from "@/components/cart";
+import { useCart } from "@/app/cart-provider";
 import {
   Utensils,
   Info,
   ShoppingCart,
-  Phone,
-  MapPin,
   Sun,
   Moon,
   Menu,
@@ -25,6 +24,7 @@ import {
 export default function Header() {
   const pathname = usePathname();
   const { theme, toggleTheme, mounted } = useTheme();
+  const { count } = useCart();
 
   // Mobile drawer state
   const [open, setOpen] = useState(false);
@@ -114,6 +114,20 @@ export default function Header() {
               <Menu className="h-4 w-4" />
             </button>
 
+            {/* Mobile checkout icon with count */}
+            <Link
+              href="/checkout"
+              aria-label={`Checkout (${count} item${count === 1 ? "" : "s"})`}
+              className="relative inline-flex md:hidden items-center justify-center h-9 w-9 rounded-full border border-foreground/20 text-foreground/80 hover:bg-foreground/5"
+            >
+              <ShoppingCart className="h-4 w-4" />
+              {count > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[1.1rem] inline-flex items-center justify-center rounded-full bg-maroon text-pure text-[10px] leading-none px-1.5 py-0.5">
+                  {count}
+                </span>
+              )}
+            </Link>
+
             <div className="hidden md:flex items-center gap-2">
               {navLink("/", "Home", Utensils)}
               {navLink("/menu", "Bar Menu", FileDown)}
@@ -135,7 +149,7 @@ export default function Header() {
                   : "Theme"
               }
               aria-pressed={theme === "dark"}
-              className="inline-flex items-center justify-center h-9 w-9 rounded-full border border-foreground/20 text-foreground/80 hover:bg-foreground/5"
+              className="hidden md:inline-flex items-center justify-center h-9 w-9 rounded-full border border-foreground/20 text-foreground/80 hover:bg-foreground/5"
               title={
                 mounted
                   ? theme === "dark"
@@ -217,7 +231,7 @@ export default function Header() {
             href="/benefits"
             className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5"
           >
-            + <HeartPulse className="h-4 w-4" /> Benefits +{" "}
+            <HeartPulse className="h-4 w-4" /> Benefits
           </Link>
           <Link
             onClick={() => setOpen(false)}
@@ -235,28 +249,12 @@ export default function Header() {
           </Link>
           <Link
             onClick={() => setOpen(false)}
-            href="/cart"
+            href="/checkout"
             className="inline-flex items-center gap-2 rounded-lg px-3 py-2 hover:bg-foreground/5"
           >
-            <ShoppingCart className="h-4 w-4" /> Cart
+            <ShoppingCart className="h-4 w-4" /> Checkout
           </Link>
         </nav>
-
-        <div className="mt-auto p-4 border-t border-black/10 dark:border-white/10 space-y-2">
-          <button
-            onClick={toggleTheme}
-            disabled={!mounted}
-            className="w-full inline-flex items-center justify-between rounded-lg border border-foreground/20 px-3 py-2 text-sm hover:bg-foreground/5"
-          >
-            <span>Theme</span>
-            {mounted &&
-              (theme === "dark" ? (
-                <Sun className="h-4 w-4" />
-              ) : (
-                <Moon className="h-4 w-4" />
-              ))}
-          </button>
-        </div>
       </aside>
     </>
   );
