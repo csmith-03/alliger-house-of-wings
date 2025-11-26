@@ -7,6 +7,7 @@ import { useCart } from "@/app/cart-provider";
 export default function ProductCard({ product }: { product: any }) {
   const { add } = useCart();
   const variants = product.variants || [];
+  const [added, setAdded] = useState(false);
   const [chosen, setChosen] = useState(
     variants.length === 1 ? variants[0] : null
   );
@@ -59,14 +60,15 @@ export default function ProductCard({ product }: { product: any }) {
         <div className="mt-4 flex items-center justify-between">
           {chosen && (
             <span className="text-sm text-foreground/60">
-              {(chosen.unitAmount / 100).toFixed(2)} {chosen.currency.toUpperCase()}
+              {(chosen.unitAmount / 100).toFixed(2)}{" "}
+              {chosen.currency.toUpperCase()}
             </span>
           )}
           <button
             type="button"
             disabled={!chosen}
-            onClick={() =>
-              chosen &&
+            onClick={() => {
+              if (!chosen) return;
               add(
                 {
                   productId: product.id,
@@ -77,11 +79,25 @@ export default function ProductCard({ product }: { product: any }) {
                   image: product.image,
                 },
                 1
-              )
-            }
-            className="rounded-md bg-[#7a0d0d] text-white px-4 py-2 text-sm font-medium hover:brightness-110 disabled:opacity-50"
+              );
+              setAdded(true);
+              // Revert after 1.5s
+              window.clearTimeout((window as any).__aw_added_to_cart_timeout);
+              (window as any).__aw_added_to_cart_timeout = window.setTimeout(
+                () => {
+                  setAdded(false);
+                },
+                1500
+              );
+            }}
+            className={[
+              "rounded-md px-4 py-2 text-sm font-medium disabled:opacity-50 transition-colors",
+              added
+                ? "bg-amber-600 text-white hover:brightness-110"
+                : "bg-[#7a0d0d] text-white hover:brightness-110",
+            ].join(" ")}
           >
-            {chosen ? `Add ${chosen.size}` : "Select a size"}
+            {added ? "Added" : chosen ? `Add ${chosen.size}` : "Select a size"}
           </button>
         </div>
       </div>
