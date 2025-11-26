@@ -305,13 +305,14 @@ function CheckoutFlowUI(props: {
       const origin =
         typeof window !== "undefined"
           ? window.location.origin
-          : (process.env.NEXT_PUBLIC_SITE_URL ?? "");
+          : process.env.NEXT_PUBLIC_SITE_URL ?? "";
 
       const { error } = await stripe.confirmPayment({
         elements,
         clientSecret,
         confirmParams: {
-          return_url: `${origin}/checkout/confirmation`,
+          // go to handoff route, not directly to /checkout/confirmation
+          return_url: `${origin}/checkout/confirmation/stripe-redirect`,
         },
       });
       if (error) {
