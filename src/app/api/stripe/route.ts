@@ -41,11 +41,13 @@ export async function POST(req: Request) {
       rateId,
     } = await req.json();
 
-    const safeItems = sanitize(items as CartLine[]);
+    const rawItems = items as CartLine[];
+    const safeItems = sanitize(rawItems);
 
     // normalize missing prices from Stripe
     const enriched = await Promise.all(
-      safeItems.map(async (it) => {
+      safeItems.map(async (it, idx) => {
+        const raw = rawItems[idx] || {};
         const productId = String(it.id);
         let unitAmount = Number(it.unitAmount ?? 0);
 
@@ -61,12 +63,18 @@ export async function POST(req: Request) {
           }
         }
 
+        const priceId =
+          (raw as any).priceId ??
+          (raw as any).price_id ??
+          null;
+
         return {
           ...it,
           id: productId,
           productId,
           unitAmount,
           quantity: Number(it.quantity ?? 1),
+          priceId,
         };
       })
     );

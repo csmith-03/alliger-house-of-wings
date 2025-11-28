@@ -79,10 +79,7 @@ export default function CheckoutPage() {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        items: norm.map((it) => ({
-          id: String(it.id),
-          quantity: Number(it.quantity ?? 1),
-        })),
+        items,
         currency: safeCurrency,
         shipCents,
         address: addr,
@@ -106,25 +103,39 @@ export default function CheckoutPage() {
         setBusyRates(true);
         setUiErr(null);
 
+        const friendlyMsg =
+          "Shipping rates aren't available right now. Please try again in a couple minutes";
+
         const res = await fetch("/api/shipping", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             address: addr,
             items: norm.map((it) => ({
+              name: it.name,
               quantity: Number(it.quantity ?? 1),
               weightOz: Number(it.weightOz ?? 0),
             })),
           }),
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "Failed to fetch rates.");
+        const data = await res.json().catch(() => null);
+
+        // comprehensive error check (HTTP, JSON, backend, no usable rates, etc)
+        if (!res.ok || !data || data.error || !Array.isArray(data.rates) || !data.rates.length
+        ) {
+          throw new Error(friendlyMsg);
+        }
         if (cancelled) return;
 
-        setShipOpts(data?.rates ?? []);
-        setChosen((prev: any) => prev ?? data?.rates?.[0] ?? null);
+        const rates = data.rates;
+        setShipOpts(rates);
+        setChosen(rates[0] ?? null);
       } catch (e: any) {
-        if (!cancelled) setUiErr(e?.message || "Could not get rates.");
+        console.log("[/checkout] /api/shipping error", e?.message || e);
+        if (!cancelled) {
+          setShipOpts([]);
+          setChosen(null);
+        }
       } finally {
         if (!cancelled) setBusyRates(false);
       }
@@ -417,35 +428,29 @@ function CheckoutFlowUI(props: {
           </div>
         ) : props.shipOpts.length === 0 ? (
           <p className="text-sm text-red-600">
-            No rates available. Try editing your address.
+            Shipping rates aren't available right now. Please try again in a couple minutes.
           </p>
         ) : (
           <div className="space-y-2">
-            {props.shipOpts.map((opt) => (
-              <label
-                key={opt.id}
-                className={`flex items-center justify-between rounded-md border p-3 text-sm hover:bg-[color:var(--surface-muted)] ${themeClass.surface} ${themeClass.border}`}
-              >
-                <div className="flex items-center gap-3">
-                  <input
-                    type="radio"
-                    name="ship"
-                    checked={props.chosen?.id === opt.id}
-                    onChange={() => props.setChosen(opt)}
-                    style={{
-                      accentColor: theme === "dark" ? "#dfa32e" : "#7a0d0d",
-                    }}
-                  />
+            {(() => {
+              const opt = props.chosen ?? props.shipOpts[0];
+              if (!opt) return null;
+              return (
+                <div
+                  className={`relative flex items-center justify-between rounded-md border p-3 text-sm ${themeClass.muted} ${themeClass.border}`}
+                >
                   <div>
                     <div className="font-medium">{opt.label}</div>
                     <div className={themeClass.textMuted}>
                       {opt.daysMin}–{opt.daysMax} days
                     </div>
                   </div>
+                  <div className="text-base font-semibold">
+                    ${money(opt.amount)}
+                  </div>
                 </div>
-                <div className="font-medium">${money(opt.amount)}</div>
-              </label>
-            ))}
+              );
+            })()}
           </div>
         )}
       </section>
