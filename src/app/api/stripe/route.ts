@@ -46,25 +46,45 @@ export async function POST(req: Request) {
     // normalize missing prices from Stripe
     const enriched = await Promise.all(
       safeItems.map(async (it) => {
-        const productId = String(it.id);
-        let unitAmount = Number(it.unitAmount ?? 0);
+        const rawLineId = String(it.id ?? "");
 
-        // if unitAmount not provided, look up from Stripe
-        if (!unitAmount || unitAmount <= 0) {
-          const product = await stripe.products.retrieve(productId);
-          if (product.default_price) {
-            const price =
-              typeof product.default_price === "string"
-                ? await stripe.prices.retrieve(product.default_price)
-                : product.default_price;
-            unitAmount = price?.unit_amount ?? 0;
+        // prefer explicit IDs, otherwise parse from composite id
+        const productId = String((it as any).productId ?? rawLineId).split(":")[0];
+        const priceId =
+          ((it as any).priceId ? String((it as any).priceId) : null) ??
+          (rawLineId.includes(":") ? rawLineId.split(":")[1] : null);
+        let unitAmount = 0;
+
+        // prefer variant price
+        if (priceId) {
+          const price = await stripe.prices.retrieve(priceId);
+          const priceProduct =
+            typeof price.product === "string" ? price.product : price.product?.id;
+          if (priceProduct && priceProduct !== productId) {
+            throw new Error(`Price ${priceId} does not belong to product ${productId}`);
           }
+          unitAmount = price.unit_amount ?? 0;
+        }
+
+        // fallback to product default
+        if (!unitAmount) {
+          const product = await stripe.products.retrieve(productId);
+          const defPrice =
+            typeof product.default_price === "string"
+              ? await stripe.prices.retrieve(product.default_price)
+              : product.default_price;
+          unitAmount = defPrice?.unit_amount ?? 0;
+        }
+
+        if (!unitAmount) {
+          throw new Error(`Missing unit amount for product ${productId} ${priceId ?? "(default)"}`);
         }
 
         return {
           ...it,
-          id: productId,
+          id: `${productId}:${priceId ?? "default"}`,
           productId,
+          priceId,
           unitAmount,
           quantity: Number(it.quantity ?? 1),
         };
@@ -110,6 +130,7 @@ export async function POST(req: Request) {
         cart: JSON.stringify(
           enriched.map((it) => ({
             productId: String(it.productId ?? it.id),
+            priceId: it.priceId ? String(it.priceId) : null,
             quantity: Number(it.quantity ?? 1),
           }))
         ),

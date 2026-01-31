@@ -72,7 +72,7 @@ export async function GET(request: Request, context: any) {
             }
 
             return {
-              id: product.id,
+              id: `${product.id}:${priceId ?? "default"}`,
               name,
               quantity:
                 Number.isFinite(quantity) && quantity > 0

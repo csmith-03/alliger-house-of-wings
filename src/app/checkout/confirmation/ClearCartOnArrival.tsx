@@ -22,12 +22,7 @@ import { useEffect, useRef } from "react";
 import { useCart } from "@/app/cart-provider";
 
 export default function ClearCartOnArrival() {
-  // pull cart state from context
-  const { items, clear, remove } = useCart() as {
-    items: any[];
-    clear?: () => void;
-    remove?: (id: string) => void;
-  };
+  const { clear } = useCart();
 
   // only runs once per mount
   const didRun = useRef(false);
@@ -48,6 +43,7 @@ export default function ClearCartOnArrival() {
             "ahow.cart",
             "order_cart",
             "checkout_cart",
+            "how_cart_v1",
           ].forEach((k) => localStorage.removeItem(k));
           // remove any other local storage keys with "cart" in them
           for (let i = 0; i < localStorage.length; i++) {
@@ -91,22 +87,7 @@ export default function ClearCartOnArrival() {
     // clear react/cart state
     const clearReactState = () => {
       try {
-        if (typeof clear === "function") {
-          clear();
-        } else if (
-          Array.isArray(items) &&
-          items.length &&
-          typeof remove === "function"
-        ) {
-          const ids = items
-            .map((it: any) => it?.id ?? it?.productId ?? it?.sku ?? it?.name)
-            .filter(Boolean);
-          ids.forEach((id) => {
-            try {
-              remove(id as string);
-            } catch {}
-          });
-        }
+        if (typeof clear === "function") clear();
       } catch {}
     };
 

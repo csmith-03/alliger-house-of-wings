@@ -81,6 +81,8 @@ export default function CheckoutPage() {
       body: JSON.stringify({
         items: norm.map((it) => ({
           id: String(it.id),
+          productId: String((it as any).productId),
+          priceId: (it as any).priceId ? String((it as any).priceId) : null,
           quantity: Number(it.quantity ?? 1),
         })),
         currency: safeCurrency,

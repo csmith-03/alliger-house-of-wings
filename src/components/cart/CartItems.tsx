@@ -35,13 +35,15 @@ export default function CartItems({ items, theme = "light" }: Props) {
       {items.map((raw: any) => {
         const it = sanitizeLine(raw);
         const lineTotal = it.unitAmount * it.quantity;
-        const pid = it.id;
+        const pid = it.productId;
+        const priceId = it.priceId ?? null;
+        const lineKey = it.id;
         const img = it.image ?? raw?.image ?? null;
 
         return (
-          <li key={pid} className={itemCls}>
+          <li key={lineKey} className={itemCls}>
             <button
-              onClick={() => remove(pid)}
+              onClick={() => remove(pid, priceId)}
               className={removeBtnCls}
               aria-label={`Remove ${it.name} from cart`}
               title="Remove"
@@ -74,7 +76,7 @@ export default function CartItems({ items, theme = "light" }: Props) {
                     aria-label={`Quantity for ${it.name}`}
                     className={selectCls}
                     value={it.quantity}
-                    onChange={(e) => setQty(pid, Number(e.target.value))}
+                    onChange={(e) => setQty(pid, Number(e.target.value), priceId)}
                   >
                     {Array.from({ length: 20 }, (_, i) => i + 1).map((q) => (
                       <option key={q} value={q}>

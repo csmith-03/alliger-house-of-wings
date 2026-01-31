@@ -34,7 +34,23 @@ function pickFirst<T = any>(
 }
 
 export function sanitizeLine(raw: CartLine) {
-  const id = String(pickFirst(raw, ["id", "sku", "productId", "slug"], "item"));
+  // prefer explicit product/price ids if provided (multiple Stripe variant options).
+  const rawId = String(pickFirst(raw, ["id", "productId", "product_id", "product", "sku", "slug"], "item"));
+
+  // split composite ID
+  const productId = rawId.includes(":") ? rawId.split(":")[0] : rawId;
+
+  const explicitPriceId = pickFirst(raw, ["priceId", "price_id"], null) as any;
+  const compositePriceId = rawId.includes(":") ? rawId.split(":")[1] : null;
+  const priceIdRaw = explicitPriceId ?? compositePriceId;
+  const priceId =
+    priceIdRaw === null || priceIdRaw === undefined || priceIdRaw === ""
+      ? null
+      : String(priceIdRaw);
+
+  // stable unique line id: productId + priceId (or :default)
+  const id = priceId ? `${productId}:${priceId}` : `${productId}:default`;
+
   const name = String(pickFirst(raw, ["name", "title", "label"], "Item"));
   const quantity = Math.max(
     1,
@@ -66,6 +82,8 @@ export function sanitizeLine(raw: CartLine) {
 
   return {
     id,
+    productId,
+    priceId,
     name,
     quantity,
     unitAmount,

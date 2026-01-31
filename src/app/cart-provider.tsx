@@ -14,8 +14,8 @@ export interface CartItem {
 interface CartCtx {
   items: CartItem[];
   add: (item: Omit<CartItem,"qty">, qty?: number) => void;
-  remove: (productId: string) => void;
-  setQty: (productId: string, qty: number) => void;
+  remove: (productId: string, priceId?: string | null) => void;
+  setQty: (productId: string, qty: number, priceId?: string | null) => void;
   clear: () => void;
   count: number;
   subtotal: number;
@@ -84,8 +84,8 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
 const value = useMemo(() => ({
     items,
     add,
-    remove,        // NOTE: now accepts (productId, priceId?)
-    setQty,        // NOTE: now accepts (productId, qty, priceId?)
+    remove,
+    setQty,
     clear,
     count,
     subtotal,
