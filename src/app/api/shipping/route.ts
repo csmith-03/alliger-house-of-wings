@@ -146,6 +146,11 @@ export async function POST(req: Request) {
         const est = Number(r.estimated_days) || undefined;
         return {
           id: String(r.object_id),
+
+          // Shippo service level info (for frontend filtering)
+          serviceToken: r?.servicelevel?.token ? String(r.servicelevel.token) : null,
+          serviceName: r?.servicelevel?.name ? String(r.servicelevel.name) : null,
+
           label: r?.servicelevel?.name
             ? `UPS ${r.servicelevel.name}`
             : (r?.servicelevel?.token ? `UPS ${r.servicelevel.token}` : "UPS"),

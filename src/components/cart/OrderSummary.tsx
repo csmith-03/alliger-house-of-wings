@@ -34,7 +34,7 @@ export default function OrderSummary({
   if (shippingPhase === "beforeAddress") {
     shippingLabel = "Calculated from address";
   } else if (shippingPhase === "selectRate") {
-    shippingLabel = "Select USPS option";
+    shippingLabel = "Select UPS shipping";
   } else {
     shippingLabel = ship == null ? "TBD" : `$${money(ship)}`;
   }
@@ -65,7 +65,7 @@ export default function OrderSummary({
         </div>
 
         <div className="flex items-center justify-between">
-          <dt className="text-foreground/80">Estimated tax</dt>
+          <dt className="text-foreground/80">Tax</dt>
           <dd className="text-foreground">${money(tax)}</dd>
         </div>
 
