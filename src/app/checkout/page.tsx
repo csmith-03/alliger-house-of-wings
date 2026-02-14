@@ -156,7 +156,10 @@ export default function CheckoutPage() {
             address: addr,
             items: norm.map((it) => ({
               quantity: Number(it.quantity ?? 1),
-              weightOz: Number(it.weightOz ?? 0),
+              weightOz: Number(it.weightOz ?? 0), // legacy fallback
+              name: String(it.name ?? ""),
+              productId: String((it as any).productId ?? ""),
+              priceId: (it as any).priceId ?? null,
             })),
           }),
         });
@@ -392,7 +395,7 @@ function CheckoutFlowUI(props: {
                 allowedCountries: ["US"],
                 fields: { phone: "never" },
                 defaultValues: {
-                  address: { country: "US", state: "NY" },
+                  address: { country: "US"},
                 },
               }}
               onChange={(e) => {
