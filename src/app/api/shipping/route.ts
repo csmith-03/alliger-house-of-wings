@@ -15,32 +15,44 @@
  *     items: Array<{
  *       quantity?: number,
  *       qty?: number,
- *       weightOz?: number
+ *       name?: string,
+ *       size?: string
  *     }>
  *   }
  *
  * Behavior:
  *   - Normalizes destination address (accepts multiple field names).
- *   - Only supports US addresses; requires ZIP code.
- *   - Computes total package weight in ounces from items.
- *   - Builds a parcel with fixed dimensions.
- *   - Calls Shippo API to create a shipment and get rates.
- *   - Filters for USPS services (ground, priority, express).
- *   - Returns rates in cents, sorted by price, with estimated days.
+ *   - Only supports US addresses and requires a ZIP code.
+ *   - Classifies cart items into "gallons" and "bottles" based on name/size.
+ *   - Builds one or more parcels using customer-provided packing rules:
+ *       • Gallons split into 1–4 gallon box configurations
+ *       • Bottles split into 1–12 bottle box configurations
+ *       • Quantities greater than box limits are split into multiple parcels
+ *   - If no valid parcels can be computed, returns { rates: [] }.
+ *   - Calls Shippo API to create a shipment and retrieve rates.
+ *   - Filters results to UPS carrier only.
+ *   - Further restricts results to UPS Ground (excludes Ground Saver and other services).
+ *   - Returns rates in cents, sorted by price, with estimated delivery windows.
  *
  * Output (200 OK):
  *   {
  *     rates: Array<{
  *       id: string,       // Shippo object_id
- *       label: string,    // service name
+ *       label: string,    // "UPS Ground"
  *       amount: number,   // price in cents
  *       daysMin: number,  // estimated minimum days
  *       daysMax: number   // estimated maximum days
  *     }>
  *   }
  *
- * Errors:
- *   - Returns { rates: [] } if invalid input, non-US, or Shippo error.
+ * Error / Fallback Behavior:
+ *   - Returns { rates: [] } for:
+ *       • Invalid input
+ *       • Non-US addresses
+ *       • Missing ZIP
+ *       • Missing Shippo configuration
+ *       • No UPS Ground available
+ *       • Shippo API errors
  *   - Logs errors server-side for debugging.
  */
 
@@ -172,6 +184,15 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
 
+    if (!process.env.SHIPPO_API_KEY) {
+      console.error("[/api/shipping] Missing SHIPPO_API_KEY");
+      return NextResponse.json({ rates: [] }, { status: 200 });
+    }
+    if (!ORIGIN.street1 || !ORIGIN.city || !ORIGIN.state || !ORIGIN.zip) {
+      console.error("[/api/shipping] Missing ship-from address fields", ORIGIN);
+      return NextResponse.json({ rates: [] }, { status: 200 });
+    }
+
     // normalize destination address from multiple possible options
     let addr =
       body?.address ?? body?.toAddress ?? body?.addr ?? body?.address_to ?? {};
@@ -199,22 +220,20 @@ export async function POST(req: Request) {
     const { gallons, bottles } = classifyCounts(items);
     const computedParcels = parcelsFromCounts(gallons, bottles);
 
-    // legacy fallback: total weight in ounces and a generic parcel if computedParcels is empty
-    const totalWeightOz = items.reduce((sum, li: any) => {
-      const qty = Math.max(1, Number(li?.quantity ?? li?.qty ?? 1));
-      const oz = Number(li?.weightOz ?? 0);
-      return sum + qty * oz;
-    }, 0);
-    const legacyParcel = {
-      length: 8,
-      width: 6,
-      height: 4,
-      distance_unit: "in",
-      weight: Math.max(1, Math.round(totalWeightOz || 1)),
-      mass_unit: "oz",
-    };
+    if (computedParcels.length === 0) {
+      console.warn("[/api/shipping] No parcels computed; returning empty rates");
+      return NextResponse.json({ rates: [] }, { status: 200 });
+    }
+    const parcels = computedParcels;
 
-    const parcels = computedParcels.length > 0 ? computedParcels : [legacyParcel];
+    console.log("[/api/shipping] INPUT items:", items.map(i => ({
+      name: i?.name,
+      qty: i?.quantity ?? i?.qty ?? 1,
+    })));
+
+    console.log("[/api/shipping] COUNTS:", { bottles, gallons });
+
+    console.log("[/api/shipping] PARCELS:", computedParcels);
 
     // Call Shippo API to create shipment and get rates
     const resp = await fetch("https://api.goshippo.com/shipments/", {
@@ -253,9 +272,19 @@ export async function POST(req: Request) {
 
     console.log("[/api/shipping] shipment messages:", shipment?.messages);
 
-    // UPS ONLY — filter/normalize into UI format
+    // UPS ONLY — filter/normalize into UI format and restrict to Ground only
     const rates = rawRates
       .filter((r) => r.currency === "USD" && String(r.provider).toUpperCase() === "UPS")
+      .filter((r) => {
+        const token = String(r?.servicelevel?.token || "").toLowerCase();
+        const name = String(r?.servicelevel?.name || "").toLowerCase();
+
+        if (token.includes("saver") || name.includes("saver")) return false;
+        if (token === "ups_ground") return true;
+        if (name === "ground") return true;
+
+        return false;
+      })
       .map((r) => {
         const est = Number(r.estimated_days) || undefined;
         return {
@@ -274,6 +303,8 @@ export async function POST(req: Request) {
         };
       })
       .sort((a, b) => a.amount - b.amount);
+
+console.log("[/api/shipping] returned rate labels:", rates.map(r => r.label));
 
     return NextResponse.json({ rates }, { status: 200 });
   } catch (e: any) {

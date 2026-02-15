@@ -175,7 +175,10 @@ export default function CheckoutPage() {
         const best = pickBestRate(rates);
 
         setShipOpts(rates);
-        setChosen((prev: any) => prev ?? best);
+        setChosen((prev: any) => {
+          if (prev && rates.some((r) => r.id === prev.id)) return prev;
+          return best;
+        });
       } catch (e: any) {
         if (!cancelled)
           setUiErr(
@@ -339,7 +342,7 @@ function CheckoutFlowUI(props: {
   const [payBusy, setPayBusy] = useState(false);
   const [payErr, setPayErr] = useState<string | null>(null);
 
-  const canConfirmAddress = props.addrComplete && !props.busyRates;
+  const canConfirmAddress = props.addrComplete && !props.busyRates && !props.cartDisabled;
   const canShowPayment =
     props.addrConfirmed && !!props.chosen && !props.busyRates && !props.cartDisabled;
 
@@ -458,8 +461,11 @@ function CheckoutFlowUI(props: {
       {/* UPS shipping options */}
       <section className={`rounded-md border p-4 ${themeClass.surface}`}>
         <h2 className="text-lg font-semibold mb-2">UPS Shipping</h2>
-
-        {!props.addrConfirmed ? (
+        {props.cartDisabled ? (
+          <p className="text-sm text-foreground/60">
+            Add items to your cart to see shipping options.
+          </p>
+        ) : !props.addrConfirmed ? (
           <p className="text-sm text-foreground/60">
             Confirm your address to see UPS options.
           </p>
@@ -477,7 +483,7 @@ function CheckoutFlowUI(props: {
           </p>
         ) : props.shipOpts.length === 0 ? (
           <p className="text-sm text-red-600">
-            No rates available. Try editing your address.
+            UPS Ground isn’t available for this address. Please edit your address or contact us.
           </p>
         ) : (
         (() => {
@@ -486,7 +492,7 @@ function CheckoutFlowUI(props: {
           if (!opt) {
             return (
               <p className="text-sm text-red-600">
-                No rates available. Try editing your address.
+                UPS Ground isn’t available for this address. Please edit your address or contact us.
               </p>
             );
           }
