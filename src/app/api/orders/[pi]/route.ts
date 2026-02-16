@@ -14,7 +14,8 @@ function variantName(base: string, price: any) {
 // FIX: do not constrain second argument's type; Next.js rejects custom type there.
 export async function GET(request: Request, context: any) {
   try {
-    const piId = context?.params?.pi;
+    const params = await context?.params;
+    const piId = params?.pi;
     if (!piId) {
       return NextResponse.json({ error: "missing pi" }, { status: 400 });
     }
@@ -72,7 +73,7 @@ export async function GET(request: Request, context: any) {
             }
 
             return {
-              id: product.id,
+              id: `${product.id}:${priceId ?? "default"}`,
               name,
               quantity:
                 Number.isFinite(quantity) && quantity > 0
@@ -105,8 +106,8 @@ export async function GET(request: Request, context: any) {
   } catch (err: any) {
     console.error("orders/[pi] GET error:", err);
     return NextResponse.json(
-      { error: err?.message ?? "failed" },
-      { status: 500 }
+      { error: err?.message || "Failed to load order." },
+      { status: 500 },
     );
   }
 }

@@ -41,6 +41,47 @@ const stripePromise = loadStripe(
   process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
 );
 
+// prefer UPS Ground when available or fall back to cheapest available UPS rate
+const isUpsGround = (r: any): boolean => {
+  const token = String(r?.serviceToken || "").toLowerCase().trim();
+  const name = String(r?.serviceName || "").toLowerCase().trim();
+  const label = String(r?.label || "").toLowerCase().trim();
+
+  // exclude Ground Saver
+  if (name.includes("saver") || label.includes("saver") || token.includes("saver")) {
+    return false;
+  }
+
+  // check token, name, and label
+  if (token === "ups_ground") return true;
+  if (name === "ground") return true;
+  if (label === "ups ground") return true;
+
+  return false;
+};
+
+const pickCheapestRate = (rates: any[]): any | null => {
+  if (!Array.isArray(rates) || rates.length === 0) return null;
+
+  // amount is in cents in normalized API response
+  return rates.reduce((best, r) => {
+    const a = Number(r?.amount);
+    const b = Number(best?.amount);
+    if (!Number.isFinite(a)) return best;
+    if (!best || !Number.isFinite(b) || a < b) return r;
+    return best;
+  }, null as any);
+};
+
+const pickBestRate = (rates: any[]): any | null => {
+  if (!Array.isArray(rates) || rates.length === 0) return null;
+
+  const ground = rates.find((r) => isUpsGround(r));
+  if (ground) return ground;
+
+  return pickCheapestRate(rates);
+};
+
 export default function CheckoutPage() {
   const { items, currency } = useCart();
   const { theme } = useTheme?.() || { theme: "dark" };
@@ -81,6 +122,8 @@ export default function CheckoutPage() {
       body: JSON.stringify({
         items: norm.map((it) => ({
           id: String(it.id),
+          productId: String((it as any).productId),
+          priceId: (it as any).priceId ? String((it as any).priceId) : null,
           quantity: Number(it.quantity ?? 1),
         })),
         currency: safeCurrency,
@@ -113,18 +156,34 @@ export default function CheckoutPage() {
             address: addr,
             items: norm.map((it) => ({
               quantity: Number(it.quantity ?? 1),
-              weightOz: Number(it.weightOz ?? 0),
+              weightOz: Number(it.weightOz ?? 0), // legacy fallback
+              name: String(it.name ?? ""),
+              productId: String((it as any).productId ?? ""),
+              priceId: (it as any).priceId ?? null,
             })),
           }),
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || "Failed to fetch rates.");
-        if (cancelled) return;
+        if (!res.ok || data?.error) {
+          throw new Error(
+            "Shipping rates aren't available right now. Please try again in a couple minutes",
+          );
+        }
 
-        setShipOpts(data?.rates ?? []);
-        setChosen((prev: any) => prev ?? data?.rates?.[0] ?? null);
+        if (cancelled) return;
+        const rates: any[] = Array.isArray(data?.rates) ? data.rates : [];
+        const best = pickBestRate(rates);
+
+        setShipOpts(rates);
+        setChosen((prev: any) => {
+          if (prev && rates.some((r) => r.id === prev.id)) return prev;
+          return best;
+        });
       } catch (e: any) {
-        if (!cancelled) setUiErr(e?.message || "Could not get rates.");
+        if (!cancelled)
+          setUiErr(
+            "Shipping rates aren't available right now. Please try again in a couple minutes",
+          );
       } finally {
         if (!cancelled) setBusyRates(false);
       }
@@ -283,7 +342,7 @@ function CheckoutFlowUI(props: {
   const [payBusy, setPayBusy] = useState(false);
   const [payErr, setPayErr] = useState<string | null>(null);
 
-  const canConfirmAddress = props.addrComplete && !props.busyRates;
+  const canConfirmAddress = props.addrComplete && !props.busyRates && !props.cartDisabled;
   const canShowPayment =
     props.addrConfirmed && !!props.chosen && !props.busyRates && !props.cartDisabled;
 
@@ -339,7 +398,7 @@ function CheckoutFlowUI(props: {
                 allowedCountries: ["US"],
                 fields: { phone: "never" },
                 defaultValues: {
-                  address: { country: "US", state: "NY" },
+                  address: { country: "US"},
                 },
               }}
               onChange={(e) => {
@@ -402,8 +461,11 @@ function CheckoutFlowUI(props: {
       {/* UPS shipping options */}
       <section className={`rounded-md border p-4 ${themeClass.surface}`}>
         <h2 className="text-lg font-semibold mb-2">UPS Shipping</h2>
-
-        {!props.addrConfirmed ? (
+        {props.cartDisabled ? (
+          <p className="text-sm text-foreground/60">
+            Add items to your cart to see shipping options.
+          </p>
+        ) : !props.addrConfirmed ? (
           <p className="text-sm text-foreground/60">
             Confirm your address to see UPS options.
           </p>
@@ -415,13 +477,27 @@ function CheckoutFlowUI(props: {
               }`}
             />
           </div>
+        ) : props.uiErr ? (
+          <p className="text-sm text-red-600">
+            {props.uiErr}
+          </p>
         ) : props.shipOpts.length === 0 ? (
           <p className="text-sm text-red-600">
-            No rates available. Try editing your address.
+            UPS Ground isn’t available for this address. Please edit your address or contact us.
           </p>
         ) : (
-          <div className="space-y-2">
-            {props.shipOpts.map((opt) => (
+        (() => {
+          const rates = props.shipOpts || [];
+          const opt = pickBestRate(rates);
+          if (!opt) {
+            return (
+              <p className="text-sm text-red-600">
+                UPS Ground isn’t available for this address. Please edit your address or contact us.
+              </p>
+            );
+          }
+          return (
+            <div className="space-y-2">
               <label
                 key={opt.id}
                 className={`flex items-center justify-between rounded-md border p-3 text-sm hover:bg-[color:var(--surface-muted)] ${themeClass.surface} ${themeClass.border}`}
@@ -445,18 +521,11 @@ function CheckoutFlowUI(props: {
                 </div>
                 <div className="font-medium">${money(opt.amount)}</div>
               </label>
-            ))}
-          </div>
-        )}
-      </section>
-
-      {/* General error */}
-      {props.uiErr && (
-        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-          {props.uiErr}
-        </div>
+            </div>
+          );
+        })()
       )}
-
+      </section>
       {/* Payment (deferred) */}
       {canShowPayment ? (
         <>
