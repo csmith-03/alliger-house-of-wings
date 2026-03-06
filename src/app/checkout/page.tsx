@@ -37,9 +37,10 @@ import { useCart } from "@/app/cart-provider";
 import { sanitize, breakdown, estimateTax, money } from "@/lib/order-math";
 
 // one-time Stripe loader for client
-const stripePromise = loadStripe(
-  process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!,
-);
+if (!process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY) {
+  throw new Error("Missing NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY environment variable");
+}
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY);
 
 // prefer UPS Ground when available or fall back to cheapest available UPS rate
 const isUpsGround = (r: any): boolean => {
@@ -130,6 +131,8 @@ export default function CheckoutPage() {
         shipCents,
         address: addr,
         rateId: chosen.id,
+        shipDaysMin: chosen.daysMin,
+        shipDaysMax: chosen.daysMax,
       }),
     });
     const data = await res.json();
@@ -166,9 +169,15 @@ export default function CheckoutPage() {
         const data = await res.json();
         if (!res.ok || data?.error) {
           throw new Error(
-            "Shipping rates aren't available right now. Please try again in a couple minutes",
+            "Shipping rates aren't available right now. Please try again in a couple minutes.",
           );
         }
+
+      if (data.transientError) {
+        throw new Error(
+          "Shipping rates aren't available right now. Please try again in a couple minutes.",
+        );
+      }
 
         if (cancelled) return;
         const rates: any[] = Array.isArray(data?.rates) ? data.rates : [];
@@ -182,7 +191,7 @@ export default function CheckoutPage() {
       } catch (e: any) {
         if (!cancelled)
           setUiErr(
-            "Shipping rates aren't available right now. Please try again in a couple minutes",
+            "Shipping rates aren't available right now. Please try again in a couple minutes.",
           );
       } finally {
         if (!cancelled) setBusyRates(false);
@@ -271,6 +280,7 @@ export default function CheckoutPage() {
                   setUiErr(null);
                   setShipOpts([]);
                   setChosen(null);
+                  setBusyRates(true);
                   // clientSecret reset commented (deferred)
                 }}
                 onEditAddress={() => {
@@ -481,7 +491,7 @@ function CheckoutFlowUI(props: {
           <p className="text-sm text-red-600">
             {props.uiErr}
           </p>
-        ) : props.shipOpts.length === 0 ? (
+        ) : props.shipOpts.length === 0 && !props.busyRates ? (
           <p className="text-sm text-red-600">
             UPS Ground isn’t available for this address. Please edit your address or contact us.
           </p>

@@ -30,6 +30,11 @@ import { NextResponse } from "next/server";
 import { breakdown, sanitize, estimateTax, CartLine } from "@/lib/order-math";
 import { stripe } from "@/lib/stripe";
 
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
 
 export async function POST(req: Request) {
   try {
@@ -39,6 +44,8 @@ export async function POST(req: Request) {
       shipCents = 0,
       address,
       rateId,
+      shipDaysMin,
+      shipDaysMax,
     } = await req.json();
 
     const safeItems = sanitize(items as CartLine[]);
@@ -127,12 +134,17 @@ export async function POST(req: Request) {
         shipping: String(ship),
         tax: String(tax),
         rate_id: rateId || "",
-        cart: JSON.stringify(
-          enriched.map((it) => ({
-            productId: String(it.productId ?? it.id),
-            priceId: it.priceId ? String(it.priceId) : null,
-            quantity: Number(it.quantity ?? 1),
-          }))
+        ship_days_min: String(shipDaysMin ?? ""),
+        ship_days_max: String(shipDaysMax ?? ""),
+        ...Object.fromEntries(
+          chunk(
+            enriched.map((it) => ({
+              p: String(it.productId ?? it.id),
+              r: it.priceId ? String(it.priceId) : null,
+              q: Number(it.quantity ?? 1),
+            })),
+            9
+          ).map((chunk, i) => [`cart_${i}`, JSON.stringify(chunk)])
         ),
       },
     });

@@ -235,7 +235,8 @@ export async function POST(req: Request) {
 
     console.log("[/api/shipping] PARCELS:", computedParcels);
 
-    // Call Shippo API to create shipment and get rates
+    // Call Shippo separately for each parcel and sum Ground rates
+    const fetchRate = async (parcel: ParcelSpec): Promise<{ amount: number; days: number } | "transient" | null> => {
     const resp = await fetch("https://api.goshippo.com/shipments/", {
       method: "POST",
       headers: {
@@ -245,68 +246,82 @@ export async function POST(req: Request) {
       body: JSON.stringify({
         address_from: ORIGIN,
         address_to: toAddress,
-        parcels,
+        parcels: [parcel],
         async: false,
-        carrier_accounts: process.env.SHIPPO_UPS_ACCOUNT_ID ? [process.env.SHIPPO_UPS_ACCOUNT_ID] : undefined,
-      }),
-    });
+        carrier_accounts: process.env.SHIPPO_UPS_ACCOUNT_ID
+          ? [process.env.SHIPPO_UPS_ACCOUNT_ID]
+          : undefined,
+        }),
+      });
 
-    if (!resp.ok) {
-      const txt = await resp.text();
-      return NextResponse.json(
-        { rates: [], error: txt || "Shippo error" },
-        { status: 200 },
-      );
-    }
+      if (!resp.ok) {
+        const text = await resp.text();
+        if (resp.status === 429 || text.toLowerCase().includes("too many requests")) {
+          return "transient";
+        }
+        return null;
+      }
+      const shipment = await resp.json();
+      const rates: any[] = shipment?.rates ?? [];
 
-    const shipment = await resp.json();
-    const rawRates: any[] = shipment?.rates ?? [];
+      console.log("[/api/shipping] rates:", rates.map((r: any) => ({
+            provider: r.provider,
+            amount: r.amount,
+            currency: r.currency,
+            token: r.servicelevel?.token,
+            name: r.servicelevel?.name,
+          })));
 
-    console.log("[/api/shipping] rawRates:", rawRates.map((r: any) => ({
-      provider: r.provider,
-      amount: r.amount,
-      currency: r.currency,
-      token: r.servicelevel?.token,
-      name: r.servicelevel?.name,
-    })));
+      console.log("[/api/shipping] shipment messages:", shipment?.messages);
 
-    console.log("[/api/shipping] shipment messages:", shipment?.messages);
 
-    // UPS ONLY — filter/normalize into UI format and restrict to Ground only
-    const rates = rawRates
-      .filter((r) => r.currency === "USD" && String(r.provider).toUpperCase() === "UPS")
-      .filter((r) => {
+      const ground = rates.find((r: any) => {
+        if (r.currency !== "USD" || String(r.provider).toUpperCase() !== "UPS") return false;
         const token = String(r?.servicelevel?.token || "").toLowerCase();
         const name = String(r?.servicelevel?.name || "").toLowerCase();
-
         if (token.includes("saver") || name.includes("saver")) return false;
-        if (token === "ups_ground") return true;
-        if (name === "ground") return true;
+        return token === "ups_ground" || name === "ground";
+      });
 
-        return false;
-      })
-      .map((r) => {
-        const est = Number(r.estimated_days) || undefined;
-        return {
-          id: String(r.object_id),
+      const messages: any[] = shipment?.messages ?? [];
+      const isRateLimited = messages.some((m: any) =>
+        String(m?.code) === "10429" ||
+        String(m?.text || "").toLowerCase().includes("too many requests")
+      );
+      if (isRateLimited) return "transient";
 
-          // Shippo service level info (for frontend filtering)
-          serviceToken: r?.servicelevel?.token ? String(r.servicelevel.token) : null,
-          serviceName: r?.servicelevel?.name ? String(r.servicelevel.name) : null,
+     console.log("[/api/shipping] ground rate for parcel:", ground);
 
-          label: r?.servicelevel?.name
-            ? `UPS ${r.servicelevel.name}`
-            : (r?.servicelevel?.token ? `UPS ${r.servicelevel.token}` : "UPS"),
-          amount: Math.round(Number(r.amount) * 100),
-          daysMin: est ?? 2,
-          daysMax: est ? est + 1 : 5,
-        };
-      })
-      .sort((a, b) => a.amount - b.amount);
+      return ground ? { amount: Number(ground.amount), days: Number(ground.estimated_days) || 5 } : null;
+    };
+
+    const perParcelResults = await Promise.all(parcels.map(fetchRate));
+
+    const transientError = perParcelResults.some((a) => a === "transient");
+
+    if (transientError || perParcelResults.some((a) => a === null)) {
+      return NextResponse.json({ rates: [], transientError }, { status: 200 });
+    }
+
+    const resolved = perParcelResults as { amount: number; days: number }[];
+    const totalDollars = resolved.reduce((sum, a) => sum + a.amount, 0);
+    const totalCents = Math.round(totalDollars * 100);
+    const maxDays = Math.max(...resolved.map((a) => a.days));
+
+    const rates = [{
+      id: `ups_ground_${Date.now()}`,
+      serviceToken: "ups_ground",
+      serviceName: "Ground",
+      label: "UPS Ground",
+      amount: totalCents,
+      daysMin: maxDays,
+      daysMax: maxDays + 1,
+    }];
 
 console.log("[/api/shipping] returned rate labels:", rates.map(r => r.label));
 
-    return NextResponse.json({ rates }, { status: 200 });
+
+    return NextResponse.json({ rates, transientError: false }, { status: 200 });
   } catch (e: any) {
     console.error("[/api/shipping] error:", e?.message);
     return NextResponse.json(

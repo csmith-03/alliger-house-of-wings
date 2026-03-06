@@ -100,7 +100,33 @@ export default function ConfirmationClient({ pi, redirectStatus = "" }: Props) {
     );
   }
 
-  // destructure fields returned by /api/orders route
+  if (order.status === "processing") {
+    return (
+      <main className="max-w-3xl mx-auto p-6">
+        <h1 className="text-2xl font-semibold mb-4">Payment processing…</h1>
+        <p className="mb-6">
+          Your payment is being processed — check back shortly for your order confirmation.
+        </p>
+        <Link href="/" className="text-[#7a0d0d] underline">
+          Return home
+        </Link>
+      </main>
+    );
+  }
+
+  if (order.status !== "succeeded") {
+    return (
+      <main className="max-w-3xl mx-auto p-6">
+        <h1 className="text-2xl font-semibold mb-4">Payment was not completed</h1>
+        <p className="mb-4">Please review your details and try again.</p>
+        <Link href="/checkout" className="text-[#7a0d0d] underline">
+          Return to checkout
+        </Link>
+      </main>
+    );
+  }
+
+  // destructure order fields
   const {
     id,
     amount,
@@ -110,6 +136,8 @@ export default function ConfirmationClient({ pi, redirectStatus = "" }: Props) {
     shipping_cents,
     tax,
     cart,
+    ship_days_min,
+    ship_days_max,
   } = order;
 
   const cartItems: Array<{
@@ -149,37 +177,15 @@ export default function ConfirmationClient({ pi, redirectStatus = "" }: Props) {
     image?: string | null;
   }> = cart ?? [];
 
-  return (
+return (
     <main className="mx-auto max-w-4xl p-6">
-      <ClearCartOnArrival />
+      <ClearCartOnArrival status={order.status} />
 
-      <h1 className="text-3xl font-bold mb-2">Thanks for your order!</h1>
-      <p className={`${themeClass.textMuted} mb-6`}>
-        Order <span className="font-mono">#{shortId}</span>
-      </p>
+      <h1 className="text-3xl font-bold mb-1">Thanks for your order!</h1>
+      <p className={`font-mono text-sm mb-6 ${themeClass.textMuted}`}>Order #{shortId}</p>
 
       <div className="grid gap-6 lg:grid-cols-3">
         <section className="lg:col-span-2 space-y-4">
-          <div className={`rounded-md border p-4 ${themeClass.surface}`}>
-            <h2 className="text-lg font-semibold mb-3">Shipping To</h2>
-            {shipping ? (
-              <address className="not-italic text-sm leading-6">
-                <div className="font-medium">{shipping.name}</div>
-                <div>{shipping.address.line1}</div>
-                {shipping.address.line2 ? (
-                  <div>{shipping.address.line2}</div>
-                ) : null}
-                <div>
-                  {shipping.address.city}, {shipping.address.state}{" "}
-                  {shipping.address.postal_code}
-                </div>
-                <div>{shipping.address.country || "US"}</div>
-              </address>
-            ) : (
-              <p className={themeClass.textMuted}>No shipping address found.</p>
-            )}
-          </div>
-
           <div className={`rounded-md border p-4 ${themeClass.surface}`}>
             <h2 className="text-lg font-semibold mb-3">Items</h2>
             {items.length === 0 ? (
@@ -187,20 +193,11 @@ export default function ConfirmationClient({ pi, redirectStatus = "" }: Props) {
             ) : (
               <ul className="divide-y">
                 {items.map((it) => {
-                  const unit = Math.max(
-                    0,
-                    Math.round(Number(it.unitAmount) || 0),
-                  );
-                  const qty = Math.max(
-                    1,
-                    Math.round(Number(it.quantity) || 1),
-                  );
+                  const unit = Math.max(0, Math.round(Number(it.unitAmount) || 0));
+                  const qty = Math.max(1, Math.round(Number(it.quantity) || 1));
                   const line = unit * qty;
                   return (
-                    <li
-                      key={it.id}
-                      className="py-3 flex items-center justify-between gap-4"
-                    >
+                    <li key={it.id} className="py-3 flex items-center justify-between gap-4">
                       <div className="flex items-center gap-4">
                         {it.image ? (
                           <img
@@ -211,26 +208,17 @@ export default function ConfirmationClient({ pi, redirectStatus = "" }: Props) {
                         ) : null}
                         <div>
                           <div className="font-medium">{it.name}</div>
-                          <div className={`text-sm ${themeClass.textMuted}`}>
-                            Qty: {qty}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            (${(unit / 100).toFixed(2)} each)
-                          </div>
+                          <div className={`text-sm ${themeClass.textMuted}`}>Qty: {qty}</div>
+                          <div className="text-xs text-gray-500">(${(unit / 100).toFixed(2)} each)</div>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <div className="font-medium">
-                          ${(line / 100).toFixed(2)}
-                        </div>
-                      </div>
+                      <div className="text-right font-medium">${(line / 100).toFixed(2)}</div>
                     </li>
                   );
                 })}
               </ul>
             )}
           </div>
-
           <Link
             href="/"
             className={`inline-block rounded-md border px-4 py-2 hover:bg-[color:var(--surface-muted)] ${themeClass.surface}`}
@@ -258,11 +246,27 @@ export default function ConfirmationClient({ pi, redirectStatus = "" }: Props) {
               <div className="my-3 border-t" />
               <div className="flex justify-between text-base font-semibold">
                 <dt>Total</dt>
-                <dd>
-                  ${money(displayTotal)} {currency?.toUpperCase()}
-                </dd>
+                <dd>${money(displayTotal)} {currency?.toUpperCase()}</dd>
               </div>
             </dl>
+          </div>
+
+          <div className={`rounded-md border p-4 ${themeClass.surface}`}>
+            <h2 className="text-lg font-semibold mb-3">Delivery</h2>
+            {shipping ? (
+              <address className="not-italic text-sm leading-6">
+                <div className="font-medium">{shipping.name}</div>
+                <div className={themeClass.textMuted}>{shipping.address.line1}</div>
+                {shipping.address.line2 ? <div className={themeClass.textMuted}>{shipping.address.line2}</div> : null}
+                <div className={themeClass.textMuted}>{shipping.address.city}, {shipping.address.state} {shipping.address.postal_code}</div>
+              </address>
+            ) : null}
+            {(ship_days_min && ship_days_max) ? (
+              <div className={`mt-3 pt-3 border-t text-sm`}>
+                <div className="font-medium">UPS Ground</div>
+                <div className={themeClass.textMuted}>{ship_days_min}–{ship_days_max} day est.</div>
+              </div>
+            ) : null}
           </div>
         </aside>
       </div>

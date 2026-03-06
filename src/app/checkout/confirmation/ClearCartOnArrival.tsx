@@ -21,7 +21,7 @@
 import { useEffect, useRef } from "react";
 import { useCart } from "@/app/cart-provider";
 
-export default function ClearCartOnArrival() {
+export default function ClearCartOnArrival({ status }: { status: string }) {
   const { clear } = useCart();
 
   // only runs once per mount
@@ -29,6 +29,7 @@ export default function ClearCartOnArrival() {
 
   useEffect(() => {
     if (didRun.current) return;
+    if (status !== "succeeded") return;
     didRun.current = true;
 
     // wipe known cart keys from storage/cookies
